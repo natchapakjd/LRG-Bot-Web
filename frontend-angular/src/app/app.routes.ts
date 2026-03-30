@@ -12,7 +12,7 @@ import { ModeConfigurationComponent } from './components/mode-configuration/mode
 import { adminGuard, licenseGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  // Protected routes - require valid license (admin bypasses this)
+  // Protected routes - require valid license
   { path: '', component: DashboardComponent, canActivate: [licenseGuard] },
   { path: 'devices', component: DeviceManagerComponent, canActivate: [licenseGuard] },
   { path: 'daily-login', component: DailyLoginComponent, canActivate: [licenseGuard] },
@@ -21,13 +21,12 @@ export const routes: Routes = [
   { path: 'template-sets', component: TemplateSetManagerComponent, canActivate: [licenseGuard] },
   { path: 'mode-config', component: ModeConfigurationComponent, canActivate: [licenseGuard] },
   
-  // Public routes - accessible without license
-  { path: 'login', component: LoginComponent },
+  // Public routes - license activation
   { path: 'license', component: LicenseComponent },
   
-  // Admin routes
+  // Admin routes - requires login
+  { path: 'admin/login', component: LoginComponent },
   { path: 'admin/license', component: AdminLicenseComponent, canActivate: [adminGuard] },
   
   { path: '**', redirectTo: '' }
 ];
-

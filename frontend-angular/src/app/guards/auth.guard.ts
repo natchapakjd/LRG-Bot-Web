@@ -39,19 +39,12 @@ export const adminGuard: CanActivateFn = () => {
 };
 
 /**
- * Guard that requires user to be admin OR have a valid license.
- * Admin users can access all features without a license.
- * Regular users need a valid license to access protected features.
+ * Guard that requires a valid license.
+ * License-only authentication - no login required for regular users.
  */
 export const licenseGuard: CanActivateFn = async () => {
-  const authService = inject(AuthService);
   const licenseService = inject(LicenseService);
   const router = inject(Router);
-  
-  // Admin users bypass license check
-  if (authService.isAdmin()) {
-    return true;
-  }
   
   // Check if already has valid license cached
   const cachedStatus = licenseService.hasValidLicense();
