@@ -18,7 +18,7 @@ class UserRole:
 class User(Base):
     """User model for authentication."""
     
-    __tablename__ = "users"
+    __tablename__ = "t_users"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)

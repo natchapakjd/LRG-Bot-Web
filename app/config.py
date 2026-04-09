@@ -4,6 +4,7 @@ Configuration settings for the Line Rangers Bot.
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,6 +25,20 @@ MATCH_THRESHOLD = 0.8  # OpenCV template match threshold (0.0 - 1.0)
 # Server Settings
 API_HOST = "0.0.0.0"
 API_PORT = 8000
+
+# ===== Database Settings =====
+DB_DRIVER = os.getenv("DB_DRIVER", "mysql+asyncmy")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = int(os.getenv("DB_PORT", "51579"))
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "root")
+DB_NAME = os.getenv("DB_NAME", "lineranger_automation")
+
+# Optional direct URL override (highest priority)
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if not DATABASE_URL:
+	_encoded_password = quote_plus(DB_PASSWORD)
+	DATABASE_URL = f"{DB_DRIVER}://{DB_USER}:{_encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
 
 # ===== Security Settings (from environment) =====
 SECRET_KEY = os.getenv("SECRET_KEY", "lrg-bot-secret-key-change-in-production-2024")

@@ -10,17 +10,17 @@ from app.core.database import Base
 
 # Association table for many-to-many relationship between template sets and workflows
 template_set_workflow_association = Table(
-    'template_set_workflow_association',
+    't_template_set_workflow_assoc',
     Base.metadata,
-    Column('template_set_id', Integer, ForeignKey('workflow_template_sets.id', ondelete='CASCADE'), primary_key=True),
-    Column('workflow_id', Integer, ForeignKey('workflows.id', ondelete='CASCADE'), primary_key=True),
+    Column('template_set_id', Integer, ForeignKey('t_workflow_template_sets.id', ondelete='CASCADE'), primary_key=True),
+    Column('workflow_id', Integer, ForeignKey('t_workflows.id', ondelete='CASCADE'), primary_key=True),
     Column('order_index', Integer, default=0)  # For ordering workflows within a set
 )
 
 
 class WorkflowTemplateSet(Base):
     """Collection of workflows grouped together as a template set."""
-    __tablename__ = "workflow_template_sets"
+    __tablename__ = "t_workflow_template_sets"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
@@ -67,7 +67,7 @@ class WorkflowTemplateSet(Base):
 
 class ModeConfiguration(Base):
     """Maps game modes and time periods to template sets."""
-    __tablename__ = "mode_configurations"
+    __tablename__ = "t_mode_configurations"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     
@@ -78,7 +78,7 @@ class ModeConfiguration(Base):
     month_year = Column(String(7), nullable=False, index=True)
     
     # Reference to template set
-    template_set_id = Column(Integer, ForeignKey("workflow_template_sets.id", ondelete="CASCADE"), nullable=False)
+    template_set_id = Column(Integer, ForeignKey("t_workflow_template_sets.id", ondelete="CASCADE"), nullable=False)
     
     # Active flag
     is_active = Column(Boolean, default=True)

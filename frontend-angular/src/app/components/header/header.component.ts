@@ -275,6 +275,7 @@ export class HeaderComponent {
     // { id: 'farm', label: 'Auto Farm', icon: '🌾', route: '/farm', adminOnly: false },
     { id: 'workflow-builder', label: 'Workflow', icon: '⚙️', route: '/workflow-builder', adminOnly: false },
     { id: 'mode-config', label: 'Mode Config', icon: '🎮', route: '/mode-config', adminOnly: false },
+    { id: 'master-data', label: 'Master Data', icon: '🗂️', route: '/master-data', adminOnly: true },
     { id: 'admin-license', label: 'Admin', icon: '👑', route: '/admin/license', adminOnly: true },
     { id: 'settings', label: 'Settings', icon: '🔧', route: '/settings', adminOnly: false }
   ];

@@ -12,7 +12,6 @@ from pathlib import Path
 
 # Set production environment
 os.environ["IS_PRODUCTION_BUILD"] = "true"
-os.environ["LICENSE_BYPASS"] = "true"  # TODO: Set to "false" when online license is ready
 
 def get_base_path():
     """Get the base path for the application (handles Nuitka and PyInstaller bundle)."""

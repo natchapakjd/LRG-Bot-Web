@@ -10,7 +10,7 @@ from app.core.database import Base
 
 class Workflow(Base):
     """Workflow template containing action steps."""
-    __tablename__ = "workflows"
+    __tablename__ = "t_workflows"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
@@ -56,10 +56,10 @@ class Workflow(Base):
 
 class WorkflowStep(Base):
     """Single action step within a workflow."""
-    __tablename__ = "workflow_steps"
+    __tablename__ = "t_workflow_steps"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    workflow_id = Column(Integer, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False)
+    workflow_id = Column(Integer, ForeignKey("t_workflows.id", ondelete="CASCADE"), nullable=False)
     order_index = Column(Integer, nullable=False)  # For drag-drop ordering
     
     # Step type: click, swipe, wait, image_match, find_all_click, conditional
@@ -177,7 +177,7 @@ class WorkflowStep(Base):
 
 class WorkflowTemplate(Base):
     """Image templates captured for workflow matching."""
-    __tablename__ = "workflow_templates"
+    __tablename__ = "t_workflow_templates"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)

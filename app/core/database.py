@@ -1,19 +1,18 @@
 """
-Database configuration for the License System.
-Uses SQLite with async support via SQLAlchemy.
+Database configuration.
+Uses SQLAlchemy async engine with DATABASE_URL from app.config.
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-from pathlib import Path
-
-# Database file location
-DATABASE_PATH = Path(__file__).parent.parent.parent / "licenses.db"
-DATABASE_URL = f"sqlite+aiosqlite:///{DATABASE_PATH}"
+from typing import AsyncGenerator
+from app.config import DATABASE_URL
 
 # Create async engine
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,  # Set to True for SQL debugging
+    pool_pre_ping=True,
+    pool_recycle=3600,
 )
 
 # Session factory
@@ -33,7 +32,7 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Get a database session."""
     async with async_session_maker() as session:
         yield session

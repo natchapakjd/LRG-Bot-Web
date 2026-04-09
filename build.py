@@ -118,6 +118,7 @@ def build_exe():
         "--collect-all=pydantic_core",
         "--collect-all=sqlalchemy",
         "--collect-all=aiosqlite",
+        "--collect-all=asyncmy",
         "--collect-all=jose",
         "--collect-all=passlib",
         "--collect-all=bcrypt",
@@ -185,6 +186,8 @@ def build_exe():
         "--hidden-import=sqlalchemy.pool",
         "--hidden-import=sqlalchemy.dialects.sqlite",
         "--hidden-import=aiosqlite",
+        "--hidden-import=sqlalchemy.dialects.mysql",
+        "--hidden-import=asyncmy",
         
         # OpenCV & Image Processing
         "--hidden-import=cv2",

@@ -12,7 +12,7 @@ from app.core.database import Base
 class License(Base):
     """License model for storing customer licenses."""
     
-    __tablename__ = "licenses"
+    __tablename__ = "t_licenses"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     license_key: Mapped[str] = mapped_column(String(32), unique=True, nullable=False, index=True)

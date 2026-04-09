@@ -9,6 +9,7 @@ import { SettingsComponent } from './components/settings/settings.component';
 import { WorkflowBuilderComponent } from './components/workflow-builder/workflow-builder.component';
 import { TemplateSetManagerComponent } from './components/template-set-manager/template-set-manager.component';
 import { ModeConfigurationComponent } from './components/mode-configuration/mode-configuration.component';
+import { MasterDataComponent } from './components/master-data/master-data.component';
 import { adminGuard, licenseGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -20,6 +21,7 @@ export const routes: Routes = [
   { path: 'workflow-builder', component: WorkflowBuilderComponent, canActivate: [licenseGuard] },
   { path: 'template-sets', component: TemplateSetManagerComponent, canActivate: [licenseGuard] },
   { path: 'mode-config', component: ModeConfigurationComponent, canActivate: [licenseGuard] },
+  { path: 'master-data', component: MasterDataComponent, canActivate: [adminGuard] },
   
   // Public routes - license activation
   { path: 'license', component: LicenseComponent },

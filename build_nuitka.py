@@ -130,6 +130,7 @@ def build_exe():
         "--include-package=pydantic_core",
         "--include-package=sqlalchemy",
         "--include-package=aiosqlite",
+        "--include-package=asyncmy",
         "--include-package=cv2",
         "--include-package=PIL",
         "--include-package=numpy",

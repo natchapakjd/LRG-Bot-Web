@@ -17,6 +17,7 @@ from app.api.v1 import endpoints_router, websocket_router, license_router, admin
 from app.api.v1.remote import router as remote_router
 from app.api.v1.workflow import router as workflow_router
 from app.api.v1.template_set import router as template_set_router, mode_config_router
+from app.api.v1.master import router as master_router
 from app.config import (
     API_HOST, API_PORT, ALLOWED_ORIGINS,
     RATE_LIMIT_GLOBAL
@@ -26,6 +27,7 @@ from app.services.auth_service import get_auth_service
 
 # Import models to ensure tables are created
 from app.models.workflow_template_set import WorkflowTemplateSet, ModeConfiguration
+from app.models.master import MasterRole, MasterMode, MasterStepType
 
 # Configure Loguru
 logger.remove()
@@ -64,6 +66,62 @@ app.include_router(remote_router)
 app.include_router(workflow_router)
 app.include_router(template_set_router)
 app.include_router(mode_config_router)
+app.include_router(master_router)
+
+
+# ── Client auth endpoint for local client (Phase 2) ──
+from pydantic import BaseModel
+from app.services.license_service import get_license_service
+from app.config import LICENSE_BYPASS
+
+class ClientAuthRequest(BaseModel):
+    license_key: str
+    hwid: str
+
+class ClientAuthResponse(BaseModel):
+    success: bool
+    message: str
+    license_key: str | None = None
+    days_remaining: int | None = None
+    customer_name: str | None = None
+
+@app.post("/api/auth", response_model=ClientAuthResponse)
+async def client_auth(req: ClientAuthRequest):
+    """
+    Authenticate a local client using its license key + hardware ID.
+    
+    Flow:
+    - If LICENSE_BYPASS is enabled, always returns success (dev mode).
+    - First call with an un-activated key → activates and binds HWID.
+    - Subsequent calls → validates key + HWID match and checks expiry.
+    """
+    logger.info(f"🔑 Client auth: key={req.license_key[:8]}…, hwid={req.hwid[:16]}…")
+
+    # Dev bypass
+    if LICENSE_BYPASS:
+        logger.warning("⚠️ LICENSE_BYPASS is ON – skipping real validation")
+        return ClientAuthResponse(
+            success=True,
+            message="License valid (bypass mode)",
+            license_key=req.license_key,
+        )
+
+    service = get_license_service()
+
+    # activate_license handles both first-time activation and returning users
+    success, message, license_obj = await service.activate_license(
+        req.license_key,
+        req.hwid,
+    )
+
+    return ClientAuthResponse(
+        success=success,
+        message=message,
+        license_key=req.license_key if success else None,
+        days_remaining=license_obj.days_remaining if license_obj else None,
+        customer_name=license_obj.customer_name if license_obj and success else None,
+    )
+
 
 # Serve static files (frontend)
 # Handle both development and PyInstaller bundled paths
