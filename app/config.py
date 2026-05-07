@@ -14,6 +14,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
 
 # ADB Settings
+ADB_PATH = os.getenv("ADB_PATH", "adb")
 ADB_HOST = "127.0.0.1"
 ADB_PORT = 5558  # Use 'adb devices' to find your emulator port (emulator-XXXX means port XXXX)
 ADB_DEVICE_SERIAL = "emulator-5558"  # Or set to None to use host:port format
@@ -27,7 +28,7 @@ API_HOST = "0.0.0.0"
 API_PORT = 8000
 
 # ===== Database Settings =====
-DB_DRIVER = os.getenv("DB_DRIVER", "mysql+asyncmy")
+DB_DRIVER = os.getenv("DB_DRIVER", "mysql+aiomysql")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", "51579"))
 DB_USER = os.getenv("DB_USER", "root")

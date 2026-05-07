@@ -8,7 +8,7 @@ pydantic
 python-multipart
 sqlalchemy[asyncio]
 aiosqlite
-asyncmy
+aiomysql
 PyMySQL
 python-jose[cryptography]
 passlib[bcrypt]

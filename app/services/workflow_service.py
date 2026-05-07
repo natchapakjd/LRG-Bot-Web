@@ -17,8 +17,41 @@ class WorkflowService:
     """Service for managing workflows and executing them on devices."""
     
     def __init__(self):
-        self.templates_dir = os.path.join(os.path.dirname(__file__), "..", "..", "workflow_templates")
+        self.project_root = Path(__file__).resolve().parents[2]
+        self.templates_dir = str(self.project_root / "workflow_templates")
         os.makedirs(self.templates_dir, exist_ok=True)
+
+    def _normalize_step_paths(self, step: dict) -> dict:
+        """Map legacy absolute paths in DB rows to files under the current project root."""
+        normalized = dict(step)
+
+        for field_name in ("template_path", "stop_template_path"):
+            path_value = normalized.get(field_name)
+            if not path_value:
+                continue
+
+            candidate = Path(path_value)
+            if candidate.exists():
+                continue
+
+            fallback = self.project_root / "workflow_templates" / candidate.name
+            if fallback.exists():
+                normalized[field_name] = str(fallback)
+
+        save_folder = normalized.get("gacha_save_folder")
+        if save_folder and not Path(save_folder).exists():
+            normalized["gacha_save_folder"] = str(self.project_root)
+
+        return normalized
+
+    def _normalize_workflow_dict(self, workflow_data: Optional[dict]) -> Optional[dict]:
+        """Normalize workflow step paths after converting ORM rows to dicts."""
+        if not workflow_data:
+            return workflow_data
+
+        normalized = dict(workflow_data)
+        normalized["steps"] = [self._normalize_step_paths(step) for step in workflow_data.get("steps", [])]
+        return normalized
     
     # ==================== Workflow CRUD ====================
     
@@ -29,7 +62,7 @@ class WorkflowService:
                 select(Workflow).options(selectinload(Workflow.steps)).order_by(Workflow.created_at.desc())
             )
             workflows = result.scalars().all()
-            return [w.to_dict() for w in workflows]
+            return [self._normalize_workflow_dict(w.to_dict()) for w in workflows]
     
     async def get_workflow(self, workflow_id: int) -> Optional[dict]:
         """Get a single workflow by ID."""
@@ -38,7 +71,7 @@ class WorkflowService:
                 select(Workflow).options(selectinload(Workflow.steps)).where(Workflow.id == workflow_id)
             )
             workflow = result.scalar_one_or_none()
-            return workflow.to_dict() if workflow else None
+            return self._normalize_workflow_dict(workflow.to_dict()) if workflow else None
     
     async def get_master_workflow(self) -> Optional[dict]:
         """Get the current master workflow."""
@@ -47,7 +80,7 @@ class WorkflowService:
                 select(Workflow).options(selectinload(Workflow.steps)).where(Workflow.is_master == True)
             )
             workflow = result.scalar_one_or_none()
-            return workflow.to_dict() if workflow else None
+            return self._normalize_workflow_dict(workflow.to_dict()) if workflow else None
     
     async def get_workflow_for_mode(self, mode_name: str, month_year: Optional[str] = None) -> Optional[dict]:
         """Get the workflow assigned to a specific mode and month.
@@ -75,7 +108,7 @@ class WorkflowService:
             workflow = result.scalars().first()  # Use first() to handle multiple matches
             
             if workflow:
-                return workflow.to_dict()
+                return self._normalize_workflow_dict(workflow.to_dict())
             
             # If no exact match, try to find any workflow for this mode
             result = await session.execute(
@@ -85,7 +118,7 @@ class WorkflowService:
             )
             workflow = result.scalars().first()  # Use first() to handle multiple matches
             
-            return workflow.to_dict() if workflow else None
+            return self._normalize_workflow_dict(workflow.to_dict()) if workflow else None
     
     async def list_workflows_for_mode(self, mode_name: str) -> List[dict]:
         """Get all workflows assigned to a specific mode."""
@@ -96,7 +129,7 @@ class WorkflowService:
                 .order_by(Workflow.month_year.desc(), Workflow.is_master.desc())
             )
             workflows = result.scalars().all()
-            return [w.to_dict() for w in workflows]
+            return [self._normalize_workflow_dict(w.to_dict()) for w in workflows]
     
     async def create_workflow(self, data: dict) -> dict:
         """Create a new workflow."""
@@ -129,7 +162,7 @@ class WorkflowService:
                 select(Workflow).options(selectinload(Workflow.steps)).where(Workflow.id == workflow.id)
             )
             workflow = result.scalar_one()
-            return workflow.to_dict()
+            return self._normalize_workflow_dict(workflow.to_dict())
     
     async def update_workflow(self, workflow_id: int, data: dict) -> Optional[dict]:
         """Update a workflow and its steps."""
@@ -186,7 +219,7 @@ class WorkflowService:
                 select(Workflow).options(selectinload(Workflow.steps)).where(Workflow.id == workflow_id)
             )
             workflow = result.scalar_one()
-            return workflow.to_dict()
+            return self._normalize_workflow_dict(workflow.to_dict())
     
     async def delete_workflow(self, workflow_id: int) -> bool:
         """Delete a workflow."""

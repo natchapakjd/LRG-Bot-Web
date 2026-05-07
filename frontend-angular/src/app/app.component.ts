@@ -17,7 +17,7 @@ import { HeaderComponent } from './components/header/header.component';
 
       <footer class="glass-footer">
         <div class="footer-content">
-          <p>Langers Bot <span class="version">v2.0</span></p>
+          <p>Langers Bot <span class="version">v1.0</span></p>
           <span class="separator">•</span>
           <p class="copyright">© 2025 NextGen Automation</p>
         </div>

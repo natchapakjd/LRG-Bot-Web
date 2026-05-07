@@ -6,6 +6,7 @@ from typing import List, Optional, Dict
 from dataclasses import dataclass, field
 from enum import Enum
 from loguru import logger
+from app.config import ADB_PATH
 
 
 class DeviceTask(str, Enum):
@@ -57,7 +58,7 @@ class DeviceManager:
         """Scan for ADB devices and update the device list."""
         try:
             result = subprocess.run(
-                ["adb", "devices", "-l"],
+                [ADB_PATH, "devices", "-l"],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -112,7 +113,7 @@ class DeviceManager:
         """Get screen size for a device."""
         try:
             result = subprocess.run(
-                ["adb", "-s", serial, "shell", "wm", "size"],
+                [ADB_PATH, "-s", serial, "shell", "wm", "size"],
                 capture_output=True,
                 text=True,
                 timeout=5

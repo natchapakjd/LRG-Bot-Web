@@ -310,10 +310,10 @@ class DailyLoginService:
         
         # Copy from app's shared_prefs to sdcard using root
         self._emit_log(f"📤 Copying account data from game...")
-        copy_success = adb.shell_su(f"cp {LINERANGERS_PREF_PATH} {temp_path}")
+        copy_success, copy_output = adb.shell_su(f"cp {LINERANGERS_PREF_PATH} {temp_path}")
         
-        if copy_success is None:
-            result["message"] = "Failed to copy file from game (need root access)"
+        if not copy_success:
+            result["message"] = f"Failed to copy file from game (need root access): {copy_output}"
             return result
         
         # Set permissions so we can pull it
@@ -696,6 +696,7 @@ class DailyLoginService:
                         self._emit_log(f"    === Loop #{iteration}/{loop_max_iterations} ===")
                         
                         # Execute all steps in the group
+                        gacha_matched = False
                         for group_step in group_steps:
                             if self._stop_event.is_set():
                                 break
@@ -732,8 +733,15 @@ class DailyLoginService:
                                 self._wait(0.5)
                             
                             elif gs_type == "gacha_check":
-                                # OCR check for gacha character
-                                self._execute_gacha_check_step(group_step, iteration)
+                                # OCR check for gacha character - break loop immediately if matched
+                                gacha_matched = self._execute_gacha_check_step(group_step, iteration)
+                                if gacha_matched:
+                                    self._emit_log(f"    ✅ Gacha matched! Breaking repeat_group loop")
+                                    break
+                        
+                        # Break outer loop if gacha matched (avoid double export)
+                        if gacha_matched:
+                            break
                         
                         # Check stop condition AFTER running all group steps
                         if stop_template_path:

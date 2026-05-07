@@ -590,6 +590,7 @@ async def restart_game(serial: str):
     """Force stop and restart Line Rangers game."""
     import subprocess
     import time
+    from app.config import ADB_PATH
     
     manager = get_device_manager()
     device = manager.get_device(serial)
@@ -606,7 +607,7 @@ async def restart_game(serial: str):
     try:
         # Force stop the game
         subprocess.run(
-            ["adb", "-s", serial, "shell", "am", "force-stop", package_name],
+            [ADB_PATH, "-s", serial, "shell", "am", "force-stop", package_name],
             capture_output=True,
             timeout=5
         )
@@ -615,7 +616,7 @@ async def restart_game(serial: str):
         
         # Start the game
         result = subprocess.run(
-            ["adb", "-s", serial, "shell", "monkey", "-p", package_name, "-c", "android.intent.category.LAUNCHER", "1"],
+            [ADB_PATH, "-s", serial, "shell", "monkey", "-p", package_name, "-c", "android.intent.category.LAUNCHER", "1"],
             capture_output=True,
             timeout=5
         )

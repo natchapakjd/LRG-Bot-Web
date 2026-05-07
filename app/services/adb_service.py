@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 from loguru import logger
 import numpy as np
 import cv2
+from app.config import ADB_PATH
 
 
 class AdbService:
@@ -14,6 +15,7 @@ class AdbService:
     def __init__(self, host: str = "127.0.0.1", port: int = 5555, device_serial: str = None):
         self.host = host
         self.port = port
+        self._adb = ADB_PATH
         # Use device_serial if provided, otherwise use host:port format
         self.device_address = device_serial if device_serial else f"{host}:{port}"
         self._connected = False
@@ -27,7 +29,7 @@ class AdbService:
         try:
             # First check if device is already available
             result = subprocess.run(
-                ["adb", "devices"],
+                [self._adb, "devices"],
                 capture_output=True,
                 encoding='utf-8',
                 errors='replace',
@@ -43,7 +45,7 @@ class AdbService:
             # If not found and using host:port format, try to connect via TCP/IP
             if ":" in self.device_address:
                 result = subprocess.run(
-                    ["adb", "connect", self.device_address],
+                    [self._adb, "connect", self.device_address],
                     capture_output=True,
                     encoding='utf-8',
                     errors='replace',
@@ -69,7 +71,7 @@ class AdbService:
     def disconnect(self) -> bool:
         """Disconnect from the ADB device."""
         try:
-            subprocess.run(["adb", "disconnect", self.device_address], capture_output=True)
+            subprocess.run([self._adb, "disconnect", self.device_address], capture_output=True)
             self._connected = False
             logger.info(f"Disconnected from {self.device_address}")
             return True
@@ -82,7 +84,7 @@ class AdbService:
         try:
             logger.info(f"Tapping at ({x}, {y}) on device {self.device_address}")
             result = subprocess.run(
-                ["adb", "-s", self.device_address, "shell", "input", "tap", str(x), str(y)],
+                [self._adb, "-s", self.device_address, "shell", "input", "tap", str(x), str(y)],
                 capture_output=True,
                 timeout=5
             )
@@ -98,7 +100,7 @@ class AdbService:
     def press_key(self, keycode: str) -> bool:
         """Press an Android key (e.g., KEYCODE_BACK, KEYCODE_HOME)."""
         cmd = [
-            "adb", "-s", self.device_address,
+            self._adb, "-s", self.device_address,
             "shell", "input", "keyevent", keycode
         ]
         
@@ -113,7 +115,7 @@ class AdbService:
         """Swipe from one point to another."""
         try:
             subprocess.run(
-                ["adb", "-s", self.device_address, "shell", "input", "swipe", 
+                [self._adb, "-s", self.device_address, "shell", "input", "swipe", 
                  str(x1), str(y1), str(x2), str(y2), str(duration_ms)],
                 capture_output=True,
                 timeout=5
@@ -128,7 +130,7 @@ class AdbService:
         """Capture a screenshot and return as numpy array (OpenCV format)."""
         try:
             result = subprocess.run(
-                ["adb", "-s", self.device_address, "exec-out", "screencap", "-p"],
+                [self._adb, "-s", self.device_address, "exec-out", "screencap", "-p"],
                 capture_output=True,
                 timeout=10
             )
@@ -146,7 +148,7 @@ class AdbService:
         """Get the screen resolution."""
         try:
             result = subprocess.run(
-                ["adb", "-s", self.device_address, "shell", "wm", "size"],
+                [self._adb, "-s", self.device_address, "shell", "wm", "size"],
                 capture_output=True,
                 encoding='utf-8',
                 errors='replace',
@@ -166,7 +168,7 @@ class AdbService:
         """Push a file to the device."""
         try:
             result = subprocess.run(
-                ["adb", "-s", self.device_address, "push", local_path, remote_path],
+                [self._adb, "-s", self.device_address, "push", local_path, remote_path],
                 capture_output=True,
                 encoding='utf-8', 
                 errors='replace',
@@ -186,7 +188,7 @@ class AdbService:
         """Pull a file from the device to local."""
         try:
             result = subprocess.run(
-                ["adb", "-s", self.device_address, "pull", remote_path, local_path],
+                [self._adb, "-s", self.device_address, "pull", remote_path, local_path],
                 capture_output=True,
                 encoding='utf-8', 
                 errors='replace',
@@ -206,7 +208,7 @@ class AdbService:
         """Run a shell command without root."""
         try:
             result = subprocess.run(
-                ["adb", "-s", self.device_address, "shell", command],
+                [self._adb, "-s", self.device_address, "shell", command],
                 capture_output=True,
                 encoding='utf-8',
                 errors='replace',
@@ -228,7 +230,7 @@ class AdbService:
             logger.debug(f"Running: adb -s {self.device_address} shell {full_shell_cmd}")
             
             result = subprocess.run(
-                ["adb", "-s", self.device_address, "shell", full_shell_cmd],
+                [self._adb, "-s", self.device_address, "shell", full_shell_cmd],
                 capture_output=True,
                 encoding='utf-8',
                 errors='replace',
@@ -249,7 +251,7 @@ class AdbService:
         """Force stop an application."""
         try:
             subprocess.run(
-                ["adb", "-s", self.device_address, "shell", "am", "force-stop", package],
+                [self._adb, "-s", self.device_address, "shell", "am", "force-stop", package],
                 capture_output=True,
                 timeout=10
             )
@@ -264,7 +266,7 @@ class AdbService:
         try:
             # Method 1: If activity is specified, use am start directly
             if activity:
-                cmd = ["adb", "-s", self.device_address, "shell", "am", "start", "-n", f"{package}/{activity}"]
+                cmd = [self._adb, "-s", self.device_address, "shell", "am", "start", "-n", f"{package}/{activity}"]
                 logger.debug(f"Method 1: Running command: {' '.join(cmd)}")
                 result = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=10)
                 
@@ -274,7 +276,7 @@ class AdbService:
         
             # Method 2: Try to find and launch main activity using pm dump
             logger.debug(f"Method 2: Trying to find launcher activity...")
-            dump_cmd = ["adb", "-s", self.device_address, "shell", "pm", "dump", package]
+            dump_cmd = [self._adb, "-s", self.device_address, "shell", "pm", "dump", package]
             # Use utf-8 with replace to avoid UnicodeDecodeError on Windows/Thai locale
             dump_result = subprocess.run(dump_cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=15)
             
@@ -307,7 +309,7 @@ class AdbService:
                             break
             
             if detected_activity:
-                cmd = ["adb", "-s", self.device_address, "shell", "am", "start", "-n", detected_activity]
+                cmd = [self._adb, "-s", self.device_address, "shell", "am", "start", "-n", detected_activity]
                 result = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=10)
                 if result.returncode == 0 and "Error" not in result.stdout:
                     logger.info(f"Started (method 2 - detected): {package}")
@@ -315,7 +317,7 @@ class AdbService:
         
             # Method 3: Use am start with implicit intent
             logger.debug(f"Method 3: Using implicit intent...")
-            cmd = ["adb", "-s", self.device_address, "shell", "am", "start", 
+            cmd = [self._adb, "-s", self.device_address, "shell", "am", "start", 
                    "-a", "android.intent.action.MAIN",
                    "-c", "android.intent.category.LAUNCHER",
                    "-n", f"{package}/.MainActivity"]
@@ -327,7 +329,7 @@ class AdbService:
             
             # Method 3.5: Implicit intent without activity inference (let system resolve)
             logger.debug(f"Method 3.5: Implicit intent (package only)...")
-            cmd = ["adb", "-s", self.device_address, "shell", "am", "start", 
+            cmd = [self._adb, "-s", self.device_address, "shell", "am", "start", 
                    "-a", "android.intent.action.MAIN",
                    "-c", "android.intent.category.LAUNCHER", 
                    package]
@@ -338,7 +340,7 @@ class AdbService:
 
             # Method 4: Use monkey (with category)
             logger.debug(f"Method 4: Using monkey with category...")
-            cmd = ["adb", "-s", self.device_address, "shell", "monkey", 
+            cmd = [self._adb, "-s", self.device_address, "shell", "monkey", 
                    "-p", package, 
                    "-c", "android.intent.category.LAUNCHER", 
                    "1"]
@@ -353,7 +355,7 @@ class AdbService:
             
             # Monkey might fail but app could still launch
             # Check if app is now in foreground
-            check_cmd = ["adb", "-s", self.device_address, "shell", "dumpsys", "window", "windows"]
+            check_cmd = [self._adb, "-s", self.device_address, "shell", "dumpsys", "window", "windows"]
             check_result = subprocess.run(check_cmd, capture_output=True, encoding='utf-8', errors='replace', timeout=5)
             
             if package in check_result.stdout:
