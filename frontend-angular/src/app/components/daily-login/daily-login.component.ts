@@ -35,6 +35,8 @@ interface DevicePreview {
   serial: string;
   status: string;
   image: string | null;
+  currentAccount?: string;
+  isRunning?: boolean;
 }
 
 @Component({
@@ -81,6 +83,11 @@ interface DevicePreview {
                       <span class="running-badge">▶️ Running</span>
                     }
                   </span>
+                  @if (getDeviceCurrentAccount(device.serial)) {
+                    <span class="device-current-account" [title]="getDeviceCurrentAccount(device.serial)">
+                      XML: {{ getDeviceCurrentAccount(device.serial) }}
+                    </span>
+                  }
                 </div>
               </label>
             }
@@ -125,6 +132,20 @@ interface DevicePreview {
       <div class="card accounts-section" *ngIf="status().accounts.length > 0">
         <div class="accounts-header">
           <h3>👥 Accounts Found ({{ status().total_accounts }})</h3>
+          <div class="accounts-header-actions">
+            <label class="select-all-label">
+              <input 
+                type="checkbox" 
+                [checked]="isAllAccountsSelected()"
+                [indeterminate]="isSomeAccountsSelected()"
+                (change)="toggleSelectAllAccounts()"
+              />
+              <span>เลือกทั้งหมด</span>
+            </label>
+            <span class="selected-accounts-count" *ngIf="selectedAccountFilepaths.size > 0">
+              {{ selectedAccountFilepaths.size }} ไฟล์ที่เลือก
+            </span>
+          </div>
           <div class="progress-info" *ngIf="status().state === 'running'">
             <span class="current-account">▶ {{ status().current_account }}</span>
             <span class="progress-text">{{ status().processed_count }}/{{ status().total_accounts }}</span>
@@ -147,7 +168,14 @@ interface DevicePreview {
             [class.processing]="account.running_on_device"
             [class.success]="account.processed && account.success"
             [class.failed]="account.processed && !account.success"
+            [class.selected]="selectedAccountFilepaths.has(getAccountSelectionKey(account))"
           >
+            <input 
+              type="checkbox"
+              class="account-checkbox"
+              [checked]="selectedAccountFilepaths.has(getAccountSelectionKey(account))"
+              (change)="toggleAccountSelection(account)"
+            />
             <span class="account-index">{{ i + 1 }}</span>
             <span class="account-icon">
               {{ getAccountIcon(account) }}
@@ -168,6 +196,84 @@ interface DevicePreview {
             >
               🗑️
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Copy Selected Accounts Tool -->
+      <div class="card copy-accounts-section" *ngIf="status().accounts.length > 0">
+        <h3>📋 Copy Selected Accounts</h3>
+        <p class="hint-text">เลือกไฟล์จากรายการด้านบน แล้ว Copy ไปยัง folder ปลายทาง (พร้อมตั้งชื่อกำกับได้)</p>
+
+        <div class="copy-form">
+          <!-- Label -->
+          <div class="folder-row">
+            <label>🏷️ ชื่อกำกับ / Label (optional)</label>
+            <input
+              type="text"
+              [(ngModel)]="copyLabel"
+              placeholder="เช่น batch_01, vip_accounts (จะสร้างเป็น subfolder)"
+              class="folder-input"
+            />
+          </div>
+
+          <!-- Destination Folder -->
+          <div class="folder-row">
+            <label>📂 Folder ปลายทาง</label>
+            <div class="folder-input-group">
+              <input
+                type="text"
+                [(ngModel)]="copyDestFolder"
+                placeholder="เลือก folder ปลายทาง..."
+                class="folder-input"
+              />
+              <button
+                class="btn btn-secondary btn-small"
+                (click)="browseCopyDestFolder()"
+                [disabled]="isBrowsingCopyDest()"
+              >
+                {{ isBrowsingCopyDest() ? '⏳' : '📁' }}
+              </button>
+            </div>
+            <p class="folder-hint" *ngIf="copyLabel && copyDestFolder">
+              จะ copy ไปที่: {{ copyDestFolder }}\\{{ copyLabel }}\\
+            </p>
+            <p class="folder-hint" *ngIf="!copyLabel && copyDestFolder">
+              จะ copy ไปที่: {{ copyDestFolder }}\\
+            </p>
+          </div>
+
+          <!-- Action -->
+          <div class="copy-actions">
+            <button
+              class="btn btn-success"
+              (click)="copySelectedAccounts()"
+              [disabled]="isCopyingAccounts() || selectedAccountFilepaths.size === 0 || !copyDestFolder"
+            >
+              {{ isCopyingAccounts() ? '⏳ Copying...' : '📋 Copy ' + selectedAccountFilepaths.size + ' file(s)' }}
+            </button>
+            <button
+              class="btn btn-secondary"
+              (click)="selectedAccountFilepaths.clear()"
+              [disabled]="selectedAccountFilepaths.size === 0"
+            >
+              ✕ ล้างการเลือก
+            </button>
+          </div>
+        </div>
+
+        <!-- Copy Result -->
+        <div class="copy-result" *ngIf="copyResult">
+          <div class="result-summary" [class.success]="copyResult.success" [class.error]="!copyResult.success">
+            {{ copyResult.message }}
+          </div>
+          <div class="result-stats" *ngIf="copyResult.copied?.length > 0">
+            <span>✅ Copied: {{ copyResult.copied.length }}</span>
+            <span *ngIf="copyResult.errors?.length > 0">❌ Errors: {{ copyResult.errors.length }}</span>
+            <span *ngIf="copyResult.destination">📁 {{ copyResult.destination }}</span>
+          </div>
+          <div class="duplicates-errors" *ngIf="copyResult.errors?.length > 0">
+            <div class="error-item" *ngFor="let e of copyResult.errors">⚠️ {{ e }}</div>
           </div>
         </div>
       </div>
@@ -354,6 +460,16 @@ interface DevicePreview {
               <div class="preview-header">
                 <span class="device-name">{{ preview.serial }}</span>
                 <span class="status-dot" [class.online]="preview.status === 'online'"></span>
+              </div>
+              <div class="preview-account" [class.active]="preview.isRunning && !!preview.currentAccount">
+                @if (preview.currentAccount) {
+                  <span class="preview-account-label">XML</span>
+                  <span class="preview-account-name" [title]="preview.currentAccount">{{ preview.currentAccount }}</span>
+                } @else if (preview.status === 'online') {
+                  <span class="preview-account-idle">ว่างอยู่</span>
+                } @else {
+                  <span class="preview-account-idle">Offline</span>
+                }
               </div>
               <div class="preview-screen">
                 @if (preview.image) {
@@ -585,6 +701,17 @@ interface DevicePreview {
       font-size: 0.65rem;
       font-weight: 600;
       margin-left: 0.25rem;
+    }
+
+    .device-current-account {
+      font-size: 0.7rem;
+      color: #cbd5e1;
+      background: rgba(0, 245, 255, 0.08);
+      border: 1px solid rgba(0, 245, 255, 0.18);
+      border-radius: 6px;
+      padding: 0.2rem 0.4rem;
+      line-height: 1.25;
+      word-break: break-word;
     }
 
     .selected-count {
@@ -1340,6 +1467,47 @@ interface DevicePreview {
       background: #22c55e;
     }
 
+    .preview-account {
+      min-height: 2.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      margin-bottom: 0.5rem;
+      padding: 0.45rem 0.55rem;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 8px;
+    }
+
+    .preview-account.active {
+      border-color: rgba(0, 245, 255, 0.35);
+      background: rgba(0, 245, 255, 0.08);
+    }
+
+    .preview-account-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #00f5ff;
+    }
+
+    .preview-account-name {
+      font-size: 0.72rem;
+      line-height: 1.2;
+      color: #e2e8f0;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .preview-account-idle {
+      font-size: 0.72rem;
+      color: #64748b;
+    }
+
     .preview-screen {
       aspect-ratio: 9/16;
       background: #0a0a0f;
@@ -1403,6 +1571,75 @@ interface DevicePreview {
     .btn-clear:hover {
       background: rgba(239, 68, 68, 0.2);
     }
+
+    /* Account selection */
+    .accounts-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .select-all-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .select-all-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #00f5ff;
+      cursor: pointer;
+    }
+
+    .selected-accounts-count {
+      font-size: 0.8rem;
+      color: #00f5ff;
+      background: rgba(0, 245, 255, 0.1);
+      padding: 0.2rem 0.6rem;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 245, 255, 0.3);
+    }
+
+    .account-checkbox {
+      width: 16px;
+      height: 16px;
+      accent-color: #00f5ff;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .account-item.selected {
+      border-color: rgba(0, 245, 255, 0.5);
+      background: rgba(0, 245, 255, 0.07);
+    }
+
+    /* Copy Accounts Section */
+    .copy-accounts-section {
+      margin-top: 0;
+    }
+
+    .copy-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .copy-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+
+    .copy-result {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+    }
   `]
 })
 export class DailyLoginComponent implements OnInit, OnDestroy {
@@ -1457,6 +1694,14 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
   // Device Preview properties
   devicePreviews = signal<DevicePreview[]>([]);
   isRefreshingScreenshots = signal(false);
+
+  // Copy Selected Accounts properties
+  selectedAccountFilepaths = new Set<string>();
+  copyLabel = '';
+  copyDestFolder = '';
+  isBrowsingCopyDest = signal(false);
+  isCopyingAccounts = signal(false);
+  copyResult: any = null;
   
   private readonly STORAGE_KEY = 'daily_login_state';
   
@@ -1552,6 +1797,10 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
 
   getSelectedDevices(): DeviceInfo[] {
     return this.devices().filter(d => d.selected && d.status === 'online');
+  }
+
+  getDeviceCurrentAccount(serial: string): string {
+    return this.devicePreviews().find(preview => preview.serial === serial)?.currentAccount || '';
   }
 
   async startOnSelectedDevices(): Promise<void> {
@@ -1670,6 +1919,8 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
           message: `${status.processed_count}/${status.total_accounts} accounts processed`,
           accounts: status.accounts || []
         }));
+
+        this.syncDevicePreviewAssignments(status.devices || []);
         
         // Log device progress
         if (status.devices && status.devices.length > 0) {
@@ -1937,6 +2188,111 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ===== Copy Selected Accounts =====
+
+  getAccountSelectionKey(account: AccountInfo): string {
+    return account.filepath || account.filename;
+  }
+
+  toggleAccountSelection(account: AccountInfo): void {
+    const selectionKey = this.getAccountSelectionKey(account);
+
+    if (this.selectedAccountFilepaths.has(selectionKey)) {
+      this.selectedAccountFilepaths.delete(selectionKey);
+    } else {
+      this.selectedAccountFilepaths.add(selectionKey);
+    }
+    // trigger change detection by reassigning
+    this.selectedAccountFilepaths = new Set(this.selectedAccountFilepaths);
+  }
+
+  isAllAccountsSelected(): boolean {
+    const accounts = this.status().accounts;
+    return accounts.length > 0 && accounts.every(a => this.selectedAccountFilepaths.has(this.getAccountSelectionKey(a)));
+  }
+
+  isSomeAccountsSelected(): boolean {
+    const accounts = this.status().accounts;
+    const count = accounts.filter(a => this.selectedAccountFilepaths.has(this.getAccountSelectionKey(a))).length;
+    return count > 0 && count < accounts.length;
+  }
+
+  toggleSelectAllAccounts(): void {
+    if (this.isAllAccountsSelected()) {
+      this.selectedAccountFilepaths = new Set();
+    } else {
+      this.selectedAccountFilepaths = new Set(this.status().accounts.map(a => this.getAccountSelectionKey(a)));
+    }
+  }
+
+  async browseCopyDestFolder(): Promise<void> {
+    this.isBrowsingCopyDest.set(true);
+    try {
+      const response = await fetch('/api/v1/daily-login/browse-folder');
+      const data = await response.json();
+      if (data.success && data.folder_path) {
+        this.copyDestFolder = data.folder_path;
+      }
+    } catch (error) {
+      this.addLog(`❌ Browse error: ${error}`);
+    } finally {
+      this.isBrowsingCopyDest.set(false);
+    }
+  }
+
+  async copySelectedAccounts(): Promise<void> {
+    if (this.selectedAccountFilepaths.size === 0 || !this.copyDestFolder) return;
+
+    this.isCopyingAccounts.set(true);
+    this.copyResult = null;
+    try {
+      const response = await fetch('/api/v1/daily-login/copy-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_filepaths: Array.from(this.selectedAccountFilepaths),
+          destination_folder: this.copyDestFolder,
+          label: this.copyLabel
+        })
+      });
+      this.copyResult = await response.json();
+      if (this.copyResult.success) {
+        this.addLog(`✅ Copied ${this.copyResult.copied?.length} file(s) to ${this.copyResult.destination}`);
+      } else {
+        this.addLog(`❌ Copy failed: ${this.copyResult.message}`);
+      }
+    } catch (error) {
+      this.copyResult = { success: false, message: `Error: ${error}`, copied: [], errors: [] };
+      this.addLog(`❌ Copy error: ${error}`);
+    } finally {
+      this.isCopyingAccounts.set(false);
+    }
+  }
+
+  private syncDevicePreviewAssignments(devices: any[] = []): void {
+    if (this.devicePreviews().length === 0) {
+      return;
+    }
+
+    const deviceMap = new Map(
+      devices.map(device => [device.serial, {
+        currentAccount: device.current_account || '',
+        isRunning: !!device.is_running
+      }])
+    );
+
+    this.devicePreviews.set(
+      this.devicePreviews().map(preview => {
+        const deviceStatus = deviceMap.get(preview.serial);
+        return {
+          ...preview,
+          currentAccount: deviceStatus?.currentAccount || '',
+          isRunning: deviceStatus?.isRunning || false
+        };
+      })
+    );
+  }
+
   private async refreshStatus(): Promise<void> {
     try {
       // Use multi-device status for accurate state
@@ -1955,6 +2311,8 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
           : s.message,
         accounts: multiStatus.accounts || s.accounts
       }));
+
+      this.syncDevicePreviewAssignments(multiStatus.devices || []);
       
       // Sync move_on_complete setting
       if (multiStatus.move_on_complete !== undefined) {
@@ -2185,10 +2543,16 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
       const data = await response.json();
 
       if (data.success) {
+        const existingPreviewMap = new Map(
+          this.devicePreviews().map(preview => [preview.serial, preview])
+        );
+
         const previews: DevicePreview[] = data.devices.map((d: any) => ({
           serial: d.serial,
           status: d.status,
-          image: d.success ? d.image : null
+          image: d.success ? d.image : null,
+          currentAccount: existingPreviewMap.get(d.serial)?.currentAccount || '',
+          isRunning: existingPreviewMap.get(d.serial)?.isRunning || false
         }));
         this.devicePreviews.set(previews);
         this.addLog(`✅ Loaded ${previews.length} device screenshots`);

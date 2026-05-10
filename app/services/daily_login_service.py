@@ -833,9 +833,14 @@ class DailyLoginService:
             
             # Export XML
             if save_folder:
-                timestamp = datetime.now().strftime("%Y%m%d")
                 clean_name = matched.replace(" ", "_").replace("/", "_")
-                filename = f"{clean_name}_{timestamp}_LINE_COCOS_PREF_KEY.xml"
+                base_filename = f"{clean_name}.xml"
+                output_path = Path(save_folder) / base_filename
+                counter = 1
+                while output_path.exists():
+                    output_path = Path(save_folder) / f"{clean_name}_{counter}.xml"
+                    counter += 1
+                filename = output_path.name
                 
                 self._emit_log(f"      💾 Exporting XML to: {save_folder}/{filename}")
                 

@@ -798,6 +798,50 @@ async def find_duplicates(request: FindDuplicatesRequest):
     }
 
 
+class CopyAccountsRequest(BaseModel):
+    source_filepaths: list[str]  # รายการ full path ของไฟล์ที่จะ copy
+    destination_folder: str      # Folder ปลายทาง
+    label: str = ""              # ชื่อ subfolder (ถ้ามี จะ copy ไปใน destination_folder/label/)
+
+
+@router.post("/daily-login/copy-accounts")
+async def copy_accounts(request: CopyAccountsRequest):
+    """
+    Copy ไฟล์ account ที่เลือกไปยัง folder ปลายทาง
+    ถ้ามี label จะสร้าง subfolder ชื่อ label ข้างใน destination_folder
+    """
+    import shutil
+    import os
+
+    dest = request.destination_folder
+    if request.label:
+        dest = os.path.join(dest, request.label)
+
+    try:
+        os.makedirs(dest, exist_ok=True)
+    except Exception as e:
+        return {"success": False, "message": f"Cannot create destination folder: {e}", "copied": [], "errors": []}
+
+    copied = []
+    errors = []
+    for filepath in request.source_filepaths:
+        try:
+            filename = os.path.basename(filepath)
+            dest_path = os.path.join(dest, filename)
+            shutil.copy2(filepath, dest_path)
+            copied.append(filename)
+        except Exception as e:
+            errors.append(f"{os.path.basename(filepath)}: {e}")
+
+    return {
+        "success": len(errors) == 0,
+        "message": f"Copied {len(copied)} file(s) to {dest}" + (f", {len(errors)} error(s)" if errors else ""),
+        "destination": dest,
+        "copied": copied,
+        "errors": errors
+    }
+
+
 class ExportAccountRequest(BaseModel):
     save_folder: str  # Folder ที่จะบันทึกไฟล์
     filename: str     # ชื่อไฟล์ที่ต้องการ

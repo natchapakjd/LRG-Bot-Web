@@ -452,6 +452,7 @@ class MultiDeviceOrchestrator:
         for acc in self.queue._accounts:
             account_info = {
                 "filename": acc.filename,
+                "filepath": acc.filepath,
                 "processed": acc.processed,
                 "success": acc.success,
                 "error_message": acc.error_message,
