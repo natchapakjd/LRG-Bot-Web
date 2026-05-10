@@ -100,6 +100,10 @@ class ExecuteWorkflowRequest(BaseModel):
     device_serial: str
 
 
+class CloneWorkflowRequest(BaseModel):
+    name: Optional[str] = None
+
+
 class ReorderStepsRequest(BaseModel):
     step_ids: List[int]  # New order of step IDs
 
@@ -210,6 +214,16 @@ async def delete_workflow(workflow_id: int):
     success = await service.delete_workflow(workflow_id)
     if success:
         return {"success": True, "message": "Workflow deleted"}
+    raise HTTPException(status_code=404, detail="Workflow not found")
+
+
+@router.post("/{workflow_id}/clone")
+async def clone_workflow(workflow_id: int, request: CloneWorkflowRequest):
+    """Clone a workflow with all steps into a new editable workflow."""
+    service = get_workflow_service()
+    workflow = await service.clone_workflow(workflow_id, request.name)
+    if workflow:
+        return {"success": True, "workflow": workflow}
     raise HTTPException(status_code=404, detail="Workflow not found")
 
 

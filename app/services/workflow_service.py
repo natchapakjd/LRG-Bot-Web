@@ -163,6 +163,52 @@ class WorkflowService:
             )
             workflow = result.scalar_one()
             return self._normalize_workflow_dict(workflow.to_dict())
+
+    async def clone_workflow(self, workflow_id: int, new_name: Optional[str] = None) -> Optional[dict]:
+        """Clone a workflow and all of its steps into a new editable workflow."""
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(Workflow).options(selectinload(Workflow.steps)).where(Workflow.id == workflow_id)
+            )
+            source_workflow = result.scalar_one_or_none()
+
+            if not source_workflow:
+                return None
+
+            clone_name = (new_name or f"{source_workflow.name} (Copy)").strip()
+            if not clone_name:
+                clone_name = f"{source_workflow.name} (Copy)"
+
+            cloned_workflow = Workflow(
+                name=clone_name,
+                description=source_workflow.description,
+                screen_width=source_workflow.screen_width,
+                screen_height=source_workflow.screen_height,
+                valid_from=source_workflow.valid_from,
+                valid_until=source_workflow.valid_until,
+                is_master=False,
+                mode_name=source_workflow.mode_name,
+                month_year=source_workflow.month_year
+            )
+            session.add(cloned_workflow)
+            await session.flush()
+
+            for source_step in source_workflow.steps:
+                session.add(
+                    self._create_step(
+                        cloned_workflow.id,
+                        source_step.order_index,
+                        source_step.to_dict()
+                    )
+                )
+
+            await session.commit()
+
+            result = await session.execute(
+                select(Workflow).options(selectinload(Workflow.steps)).where(Workflow.id == cloned_workflow.id)
+            )
+            cloned_workflow = result.scalar_one()
+            return self._normalize_workflow_dict(cloned_workflow.to_dict())
     
     async def update_workflow(self, workflow_id: int, data: dict) -> Optional[dict]:
         """Update a workflow and its steps."""

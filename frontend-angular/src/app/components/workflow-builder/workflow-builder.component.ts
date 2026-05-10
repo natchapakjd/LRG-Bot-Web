@@ -93,6 +93,9 @@ interface DeviceInfo {
             <button class="glass-button success" (click)="saveWorkflow()" [disabled]="isSaving()">
               {{ isSaving() ? 'SAVING...' : '💾 SAVE' }}
             </button>
+            <button class="glass-button info" (click)="cloneWorkflow()" [disabled]="!currentWorkflow.id || isCloning()">
+              {{ isCloning() ? 'CLONING...' : '📋 CLONE' }}
+            </button>
             <button class="glass-button primary" (click)="executeWorkflow()" [disabled]="!currentWorkflow.id || isExecuting()">
               {{ isExecuting() ? 'RUNNING...' : '▶ EXECUTE' }}
             </button>
@@ -900,6 +903,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy {
   screenImage = signal<string>('');
   logs = signal<string[]>(['🚀 Workflow Builder ready']);
   isSaving = signal(false);
+  isCloning = signal(false);
   isExecuting = signal(false);
 
   // Current workflow
@@ -1076,6 +1080,77 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy {
     } finally {
       this.isSaving.set(false);
     }
+  }
+
+  async cloneWorkflow(): Promise<void> {
+    if (!this.currentWorkflow.id) {
+      return;
+    }
+
+    const newName = await this.promptCloneWorkflowName(this.currentWorkflow.name);
+    if (!newName) {
+      return;
+    }
+
+    this.isCloning.set(true);
+
+    try {
+      const response = await fetch(`/api/v1/workflows/${this.currentWorkflow.id}/clone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName })
+      });
+
+      const data = await response.json();
+      if (data.success && data.workflow) {
+        await this.loadWorkflows();
+        this.selectedWorkflowId = String(data.workflow.id);
+        this.selectedStepIndex = -1;
+        this.editingStep = null;
+        await this.loadWorkflow();
+        this.addLog(`📋 Cloned: ${this.currentWorkflow.name} -> ${data.workflow.name}`);
+      } else {
+        this.addLog(`❌ Clone failed: ${data.message || data.detail || 'Unknown error'}`);
+      }
+    } catch (error) {
+      this.addLog(`❌ Clone error: ${error}`);
+    } finally {
+      this.isCloning.set(false);
+    }
+  }
+
+  async promptCloneWorkflowName(originalName: string): Promise<string | null> {
+    const result = await Swal.fire({
+      title: 'Clone Workflow',
+      input: 'text',
+      inputValue: `${originalName} (Copy)`,
+      inputLabel: 'New workflow name',
+      inputPlaceholder: 'Enter cloned workflow name...',
+      showCancelButton: true,
+      confirmButtonColor: '#38bdf8',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: '📋 Clone',
+      cancelButtonText: 'Cancel',
+      background: 'rgba(11, 16, 27, 0.95)',
+      color: '#f8fafc',
+      customClass: {
+        popup: 'swal-glass-popup',
+        confirmButton: 'swal-confirm-btn',
+        cancelButton: 'swal-cancel-btn'
+      },
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return 'Please enter a workflow name';
+        }
+        return null;
+      }
+    });
+
+    if (!result.isConfirmed) {
+      return null;
+    }
+
+    return result.value.trim();
   }
 
   async executeWorkflow(): Promise<void> {
