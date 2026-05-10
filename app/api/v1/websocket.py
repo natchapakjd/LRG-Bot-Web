@@ -4,10 +4,11 @@ WebSocket Handler - Real-time communication with frontend.
 import asyncio
 import base64
 import cv2
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from typing import List
 from loguru import logger
 from app.api.v1.endpoints import get_bot
+from app.services.auth_service import get_auth_service, verify_token
 
 router = APIRouter()
 
@@ -40,9 +41,32 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+async def authenticate_websocket(websocket: WebSocket) -> bool:
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return False
+
+    payload = verify_token(token)
+    if not payload or not payload.get("sub"):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return False
+
+    service = get_auth_service()
+    user = await service.get_user_by_id(int(payload["sub"]))
+    if not user or not user.is_active:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return False
+
+    return True
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates."""
+    if not await authenticate_websocket(websocket):
+        return
+
     await manager.connect(websocket)
     
     bot = get_bot()

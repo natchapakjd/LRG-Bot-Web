@@ -22,6 +22,7 @@ interface AuthResponse {
 export class AuthService {
   private TOKEN_KEY = 'lrg_bot_token';
   private USER_KEY = 'lrg_bot_user';
+  private LOGIN_PATH = '/admin/login';
   
   private _token = signal<string | null>(null);
   private _user = signal<User | null>(null);
@@ -32,8 +33,51 @@ export class AuthService {
   currentUser = computed(() => this._user());
   
   constructor() {
+    this.installFetchInterceptor();
     // Load from localStorage on init
     this.loadFromStorage();
+  }
+
+  private installFetchInterceptor(): void {
+    const globalWindow = window as typeof window & { __lrgAuthFetchInstalled?: boolean };
+    if (globalWindow.__lrgAuthFetchInstalled) {
+      return;
+    }
+
+    const originalFetch = window.fetch.bind(window);
+    globalWindow.__lrgAuthFetchInstalled = true;
+
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const requestUrl = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      const isApiRequest = requestUrl.startsWith('/api/') || requestUrl.includes('/api/');
+      const isPublicAuthRequest = requestUrl.includes('/api/v1/auth/login') || requestUrl.includes('/api/v1/auth/register');
+      const token = this._token();
+
+      let nextInit = init;
+      if (isApiRequest && !isPublicAuthRequest && token) {
+        const headers = new Headers(init?.headers ?? {});
+        if (!headers.has('Authorization')) {
+          headers.set('Authorization', `Bearer ${token}`);
+        }
+        nextInit = { ...init, headers };
+      }
+
+      const response = await originalFetch(input, nextInit);
+
+      if (isApiRequest && !isPublicAuthRequest && response.status === 401) {
+        this.clearStorage();
+        if (window.location.pathname !== this.LOGIN_PATH) {
+          window.location.assign(this.LOGIN_PATH);
+        }
+      }
+
+      return response;
+    };
   }
   
   private loadFromStorage(): void {
@@ -84,26 +128,6 @@ export class AuthService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
-      });
-      
-      const data: AuthResponse = await response.json();
-      
-      if (data.success && data.token && data.user) {
-        this.saveToStorage(data.token, data.user);
-      }
-      
-      return data;
-    } catch (error) {
-      return { success: false, message: `Error: ${error}` };
-    }
-  }
-  
-  async register(username: string, password: string, email?: string): Promise<AuthResponse> {
-    try {
-      const response = await fetch('/api/v1/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, email })
       });
       
       const data: AuthResponse = await response.json();

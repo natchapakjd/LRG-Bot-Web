@@ -150,21 +150,45 @@ class AuthService:
             return result.scalar_one_or_none()
     
     async def ensure_admin_exists(self) -> None:
-        """Ensure at least one admin user exists. Create default if not."""
+        """Ensure the configured admin account is the only active user."""
         async with async_session_maker() as session:
             result = await session.execute(
-                select(User).where(User.role == UserRole.ADMIN)
+                select(User).where(User.username == DEFAULT_ADMIN_USERNAME)
             )
-            if not result.scalar_one_or_none():
-                # Create default admin from config
-                logger.warning("No admin found, creating default admin user...")
-                await self.create_user(
+            configured_admin = result.scalar_one_or_none()
+
+            admin_password_hash = get_password_hash(DEFAULT_ADMIN_PASSWORD)
+
+            if not configured_admin:
+                configured_admin = User(
                     username=DEFAULT_ADMIN_USERNAME,
-                    password=DEFAULT_ADMIN_PASSWORD,
-                    role=UserRole.ADMIN
+                    email=None,
+                    hashed_password=admin_password_hash,
+                    role=UserRole.ADMIN,
+                    is_active=True
                 )
-                logger.warning(f"⚠️ Default admin created: {DEFAULT_ADMIN_USERNAME}")
-                logger.warning("⚠️ Please change the password immediately!")
+                session.add(configured_admin)
+                logger.warning(f"Configured admin created: {DEFAULT_ADMIN_USERNAME}")
+            else:
+                configured_admin.hashed_password = admin_password_hash
+                configured_admin.role = UserRole.ADMIN
+                configured_admin.is_active = True
+                logger.info(f"Configured admin synchronized: {DEFAULT_ADMIN_USERNAME}")
+
+            result = await session.execute(
+                select(User).where(User.username != DEFAULT_ADMIN_USERNAME)
+            )
+            other_users = result.scalars().all()
+            disabled_count = 0
+            for user in other_users:
+                if user.is_active:
+                    disabled_count += 1
+                user.is_active = False
+
+            await session.commit()
+
+            if disabled_count:
+                logger.warning(f"Disabled {disabled_count} non-configured user account(s)")
 
 
 # Singleton instance

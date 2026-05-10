@@ -26,8 +26,14 @@ export class BotService {
   }
 
   private connect(): void {
+    const token = localStorage.getItem('lrg_bot_token');
+    if (!token) {
+      this.isConnected.set(false);
+      return;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
     
     this.ws = new WebSocket(wsUrl);
     

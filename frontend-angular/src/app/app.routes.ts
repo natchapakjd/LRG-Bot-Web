@@ -10,21 +10,21 @@ import { WorkflowBuilderComponent } from './components/workflow-builder/workflow
 import { TemplateSetManagerComponent } from './components/template-set-manager/template-set-manager.component';
 import { ModeConfigurationComponent } from './components/mode-configuration/mode-configuration.component';
 import { MasterDataComponent } from './components/master-data/master-data.component';
-import { adminGuard, licenseGuard } from './guards/auth.guard';
+import { adminGuard, authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  // Protected routes - require valid license
-  { path: '', component: DashboardComponent, canActivate: [licenseGuard] },
-  { path: 'devices', component: DeviceManagerComponent, canActivate: [licenseGuard] },
-  { path: 'daily-login', component: DailyLoginComponent, canActivate: [licenseGuard] },
-  { path: 'settings', component: SettingsComponent, canActivate: [licenseGuard] },
-  { path: 'workflow-builder', component: WorkflowBuilderComponent, canActivate: [licenseGuard] },
-  { path: 'template-sets', component: TemplateSetManagerComponent, canActivate: [licenseGuard] },
-  { path: 'mode-config', component: ModeConfigurationComponent, canActivate: [licenseGuard] },
+  // Protected routes - require login
+  { path: '', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'devices', component: DeviceManagerComponent, canActivate: [authGuard] },
+  { path: 'daily-login', component: DailyLoginComponent, canActivate: [authGuard] },
+  { path: 'settings', component: SettingsComponent, canActivate: [authGuard] },
+  { path: 'workflow-builder', component: WorkflowBuilderComponent, canActivate: [authGuard] },
+  { path: 'template-sets', component: TemplateSetManagerComponent, canActivate: [authGuard] },
+  { path: 'mode-config', component: ModeConfigurationComponent, canActivate: [authGuard] },
   { path: 'master-data', component: MasterDataComponent, canActivate: [adminGuard] },
   
-  // Public routes - license activation
-  { path: 'license', component: LicenseComponent },
+  // Authenticated maintenance routes
+  { path: 'license', component: LicenseComponent, canActivate: [authGuard] },
   
   // Admin routes - requires login
   { path: 'admin/login', component: LoginComponent },

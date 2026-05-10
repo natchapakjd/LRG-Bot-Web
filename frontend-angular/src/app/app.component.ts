@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HeaderComponent } from './components/header/header.component';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -99,4 +100,8 @@ import { HeaderComponent } from './components/header/header.component';
 })
 export class AppComponent {
   title = 'Line Rangers Bot';
+
+  constructor(private authService: AuthService) {
+    void this.authService;
+  }
 }

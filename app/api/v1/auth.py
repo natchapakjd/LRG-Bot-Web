@@ -1,7 +1,7 @@
 """
 Authentication API endpoints.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
 
@@ -41,33 +41,11 @@ class AuthResponse(BaseModel):
 @router.post("/register", response_model=AuthResponse)
 async def register(request: RegisterRequest):
     """
-    Register a new user account.
-    New users get 'user' role by default.
+    Registration is disabled in single-admin mode.
     """
-    if len(request.password) < 4:
-        return AuthResponse(
-            success=False,
-            message="Password must be at least 4 characters"
-        )
-    
-    service = get_auth_service()
-    success, message, user = await service.create_user(
-        username=request.username,
-        password=request.password,
-        email=request.email
-    )
-    
-    if not success:
-        return AuthResponse(success=False, message=message)
-    
-    # Auto-login after registration
-    token = create_access_token({"sub": str(user.id), "role": user.role})
-    
-    return AuthResponse(
-        success=True,
-        message="Registration successful",
-        token=token,
-        user=user.to_dict()
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Registration is disabled"
     )
 
 

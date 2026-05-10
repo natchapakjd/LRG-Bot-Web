@@ -9,57 +9,60 @@ import { LicenseService } from '../services/license.service';
 export const authGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  
+
   if (authService.isLoggedIn()) {
-    return true;
+    return authService.checkAuth().then((isAuthenticated) => {
+      if (isAuthenticated) {
+        return true;
+      }
+
+      router.navigate(['/admin/login']);
+      return false;
+    });
   }
-  
-  router.navigate(['/login']);
+
+  router.navigate(['/admin/login']);
   return false;
 };
 
 /**
  * Guard that requires user to be an admin.
  */
-export const adminGuard: CanActivateFn = () => {
+export const adminGuard: CanActivateFn = async () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  
-  if (!authService.isLoggedIn()) {
-    router.navigate(['/login']);
+
+  const isAuthenticated = await authService.checkAuth();
+  if (!isAuthenticated) {
+    router.navigate(['/admin/login']);
     return false;
   }
-  
+
   if (!authService.isAdmin()) {
     router.navigate(['/']);
     return false;
   }
-  
+
   return true;
 };
 
 /**
- * Guard that requires a valid license.
- * License-only authentication - no login required for regular users.
+ * Legacy license guard retained for compatibility. Auth is now the primary gate.
  */
 export const licenseGuard: CanActivateFn = async () => {
-  const licenseService = inject(LicenseService);
+  const authService = inject(AuthService);
   const router = inject(Router);
-  
-  // Check if already has valid license cached
-  const cachedStatus = licenseService.hasValidLicense();
-  if (cachedStatus === true) {
+
+  const isAuthenticated = await authService.checkAuth();
+  if (!isAuthenticated) {
+    router.navigate(['/admin/login']);
+    return false;
+  }
+
+  if (authService.isLoggedIn()) {
     return true;
   }
-  
-  // If not cached or false, check with backend
-  const hasLicense = await licenseService.checkLicense();
-  
-  if (hasLicense) {
-    return true;
-  }
-  
-  // No valid license, redirect to license page
-  router.navigate(['/license']);
-  return false;
+
+  const licenseService = inject(LicenseService);
+  return licenseService.checkLicense();
 };

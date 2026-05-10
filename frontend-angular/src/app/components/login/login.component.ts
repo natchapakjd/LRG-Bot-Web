@@ -12,8 +12,8 @@ import { AuthService } from '../../services/auth.service';
     <div class="login-page">
       <div class="login-card">
         <div class="card-header">
-          <span class="icon">{{ isRegisterMode ? '📝' : '🔐' }}</span>
-          <h2>{{ isRegisterMode ? 'Create Account' : 'Login' }}</h2>
+          <span class="icon">🔐</span>
+          <h2>Secure Login</h2>
         </div>
 
         <form (ngSubmit)="submit()" class="login-form">
@@ -29,20 +29,6 @@ import { AuthService } from '../../services/auth.service';
               required
             />
           </div>
-
-          @if (isRegisterMode) {
-            <div class="form-group">
-              <label for="email">Email (optional)</label>
-              <input
-                type="email"
-                id="email"
-                [(ngModel)]="email"
-                name="email"
-                placeholder="Enter email"
-                [disabled]="isLoading()"
-              />
-            </div>
-          }
 
           <div class="form-group">
             <label for="password">Password</label>
@@ -64,16 +50,9 @@ import { AuthService } from '../../services/auth.service';
           }
 
           <button type="submit" class="btn btn-primary" [disabled]="isLoading()">
-            {{ isLoading() ? '⏳ Loading...' : (isRegisterMode ? '📝 Create Account' : '🔓 Login') }}
+            {{ isLoading() ? '⏳ Loading...' : '🔓 Login' }}
           </button>
         </form>
-
-        <div class="toggle-mode">
-          <span>{{ isRegisterMode ? 'Already have an account?' : "Don't have an account?" }}</span>
-          <a (click)="toggleMode()">
-            {{ isRegisterMode ? 'Login' : 'Register' }}
-          </a>
-        </div>
       </div>
     </div>
   `,
@@ -209,10 +188,8 @@ import { AuthService } from '../../services/auth.service';
   `]
 })
 export class LoginComponent {
-  username = '';
+  username = 'natchapakj';
   password = '';
-  email = '';
-  isRegisterMode = false;
   isLoading = signal(false);
   errorMessage = signal<string | null>(null);
 
@@ -226,11 +203,6 @@ export class LoginComponent {
     }
   }
 
-  toggleMode(): void {
-    this.isRegisterMode = !this.isRegisterMode;
-    this.errorMessage.set(null);
-  }
-
   async submit(): Promise<void> {
     if (!this.username.trim() || !this.password.trim()) {
       this.errorMessage.set('Please enter username and password');
@@ -241,9 +213,7 @@ export class LoginComponent {
     this.errorMessage.set(null);
 
     try {
-      const result = this.isRegisterMode
-        ? await this.authService.register(this.username, this.password, this.email || undefined)
-        : await this.authService.login(this.username, this.password);
+      const result = await this.authService.login(this.username, this.password);
 
       if (result.success) {
         this.router.navigate(['/']);

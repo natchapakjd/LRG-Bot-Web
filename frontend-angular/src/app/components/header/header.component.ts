@@ -1,7 +1,6 @@
 import { Component, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
-import { BotService } from '../../services/bot.service';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -259,14 +258,12 @@ import { AuthService } from '../../services/auth.service';
 })
 export class HeaderComponent {
   private router = inject(Router);
-  botService = inject(BotService);
   authService = inject(AuthService);
   
   activeMenu = 'dashboard';
   
   menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '🏠', route: '/', adminOnly: false },
-    { id: 'license', label: 'License', icon: '🔑', route: '/license', adminOnly: false },
     { id: 'devices', label: 'Devices', icon: '📱', route: '/devices', adminOnly: false },
     { id: 'daily-login', label: 'Daily Login', icon: '📅', badge: 'AUTO', route: '/daily-login', adminOnly: false },
     // { id: 'gai-ruby', label: 'Gai-Ruby', icon: '💎', badge: 'NEW', route: '/gai-ruby', adminOnly: false },
@@ -299,11 +296,11 @@ export class HeaderComponent {
   }
   
   goToLogin() {
-    this.router.navigate(['/login']);
+    this.router.navigate(['/admin/login']);
   }
   
   logout() {
     this.authService.logout();
-    this.router.navigate(['/login']);
+    this.router.navigate(['/admin/login']);
   }
 }

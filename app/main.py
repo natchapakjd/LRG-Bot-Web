@@ -1,7 +1,7 @@
 """
 Line Rangers Bot - Main Application Entry Point
 """
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +23,7 @@ from app.config import (
     RATE_LIMIT_GLOBAL
 )
 from app.core.database import init_db
-from app.services.auth_service import get_auth_service
+from app.services.auth_service import get_auth_service, require_admin, require_user
 
 # Import models to ensure tables are created
 from app.models.workflow_template_set import WorkflowTemplateSet, ModeConfiguration
@@ -57,16 +57,16 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(endpoints_router)
+app.include_router(endpoints_router, dependencies=[Depends(require_user)])
 app.include_router(websocket_router)
 app.include_router(license_router)
 app.include_router(admin_license_router)
 app.include_router(auth_router)
-app.include_router(remote_router)
-app.include_router(workflow_router)
-app.include_router(template_set_router)
-app.include_router(mode_config_router)
-app.include_router(master_router)
+app.include_router(remote_router, dependencies=[Depends(require_user)])
+app.include_router(workflow_router, dependencies=[Depends(require_user)])
+app.include_router(template_set_router, dependencies=[Depends(require_user)])
+app.include_router(mode_config_router, dependencies=[Depends(require_user)])
+app.include_router(master_router, dependencies=[Depends(require_admin)])
 
 
 # ── Client auth endpoint for local client (Phase 2) ──
