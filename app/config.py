@@ -25,9 +25,9 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 # ADB Settings
 ADB_PATH = os.getenv("ADB_PATH", "adb")
-ADB_HOST = "127.0.0.1"
-ADB_PORT = 5558  # Use 'adb devices' to find your emulator port (emulator-XXXX means port XXXX)
-ADB_DEVICE_SERIAL = "emulator-5558"  # Or set to None to use host:port format
+ADB_HOST = os.getenv("ADB_HOST", "127.0.0.1")
+ADB_PORT = int(os.getenv("ADB_PORT", "5558"))  # Use 'adb devices' to find your emulator port.
+ADB_DEVICE_SERIAL = os.getenv("ADB_DEVICE_SERIAL", "").strip() or None
 
 # Bot Settings
 BOT_LOOP_INTERVAL = 0.5  # seconds between each loop iteration

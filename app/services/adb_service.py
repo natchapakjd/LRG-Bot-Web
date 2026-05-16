@@ -20,6 +20,15 @@ class AdbService:
         # Use device_serial if provided, otherwise use host:port format
         self.device_address = device_serial if device_serial else f"{host}:{port}"
         self._connected = False
+
+    def _online_devices_from_output(self, output: str) -> list[str]:
+        """Parse `adb devices` output and return online device serials."""
+        devices = []
+        for line in output.strip().splitlines()[1:]:
+            parts = line.split()
+            if len(parts) >= 2 and parts[1] == "device":
+                devices.append(parts[0])
+        return devices
     
     @property
     def is_connected(self) -> bool:
@@ -41,6 +50,13 @@ class AdbService:
             if self.device_address in result.stdout:
                 self._connected = True
                 logger.success(f"Device {self.device_address} is available")
+                return True
+
+            online_devices = self._online_devices_from_output(result.stdout)
+            if len(online_devices) == 1:
+                self.device_address = online_devices[0]
+                self._connected = True
+                logger.success(f"Using available device {self.device_address}")
                 return True
             
             # If not found and using host:port format, try to connect via TCP/IP
@@ -226,7 +242,7 @@ class AdbService:
             logger.debug(f"Running: adb -s {self.device_address} shell su -c <command>")
             
             result = subprocess.run(
-                [self._adb, "-s", self.device_address, "shell", "su", "-c", command],
+                [self._adb, "-s", self.device_address, "shell", f"su -c {shlex.quote(command)}"],
                 capture_output=True,
                 encoding='utf-8',
                 errors='replace',

@@ -381,6 +381,10 @@ class MultiDeviceOrchestrator:
             try:
                 # Process the account
                 success = service._process_account(account)
+
+                if self._stop_event.is_set():
+                    self._emit_log(f"[{serial}] ⏸️ {account.filename} interrupted; will retry on resume")
+                    break
                 
                 # Mark as processed AFTER processing completes
                 # This ensures if we stop mid-processing, the account will be re-processed on resume
@@ -400,6 +404,10 @@ class MultiDeviceOrchestrator:
                 progress.processed_count += 1
                 
             except Exception as e:
+                if self._stop_event.is_set():
+                    self._emit_log(f"[{serial}] ⏸️ {account.filename} interrupted; will retry on resume")
+                    break
+
                 # Mark as processed even on error to avoid infinite retry
                 self.queue.mark_processed(account.filename, success=False)
                 progress.processed_count += 1
@@ -459,6 +467,11 @@ class MultiDeviceOrchestrator:
         for progress in self._device_progress.values():
             if progress.current_account:
                 account_device_map[progress.current_account] = progress.serial
+
+        current_account_display = ", ".join(
+            f"{serial}: {filename}"
+            for filename, serial in account_device_map.items()
+        )
         
         # Get accounts with device info
         accounts_status = []
@@ -490,6 +503,7 @@ class MultiDeviceOrchestrator:
             "total_accounts": self.queue.total_count,
             "processed_count": self.queue.processed_count,
             "remaining_count": self.queue.remaining_count,
+            "current_account": current_account_display,
             "workflow_id": self._workflow_id,
             "devices": [
                 {

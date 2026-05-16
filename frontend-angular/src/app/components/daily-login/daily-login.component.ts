@@ -1852,6 +1852,7 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
         this.addLog(`⏳ ${selected.length} devices now processing ${scanResult.total_accounts} accounts in parallel!`);
         
         // Start polling for multi-device status
+        await this.refreshStatus();
         this.startMultiDeviceStatusPolling();
       } else {
         this.addLog(`❌ ${startResult.message}`);
@@ -1886,6 +1887,7 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
       
       if (resumeResult.success) {
         this.addLog(`✅ ${resumeResult.message}`);
+        await this.refreshStatus();
         this.startMultiDeviceStatusPolling();
       } else {
         this.addLog(`❌ ${resumeResult.message}`);
@@ -1899,11 +1901,20 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
   }
   
   private multiDeviceStatusInterval: any = null;
+
+  private getCurrentAccountLabelFromDevices(devices: any[] = []): string {
+    return devices
+      .filter(device => device.current_account)
+      .map(device => `${device.serial}: ${device.current_account}`)
+      .join(', ');
+  }
   
   startMultiDeviceStatusPolling(): void {
     if (this.multiDeviceStatusInterval) {
       clearInterval(this.multiDeviceStatusInterval);
     }
+
+    void this.refreshStatus();
     
     this.multiDeviceStatusInterval = setInterval(async () => {
       try {
@@ -1916,6 +1927,7 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
           state: status.state,
           total_accounts: status.total_accounts,
           processed_count: status.processed_count,
+          current_account: status.current_account || this.getCurrentAccountLabelFromDevices(status.devices || []),
           message: `${status.processed_count}/${status.total_accounts} accounts processed`,
           accounts: status.accounts || []
         }));
@@ -2306,6 +2318,7 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
         folder_path: multiStatus.folder_path || s.folder_path,
         total_accounts: multiStatus.total_accounts,
         processed_count: multiStatus.processed_count,
+        current_account: multiStatus.current_account || this.getCurrentAccountLabelFromDevices(multiStatus.devices || []),
         message: multiStatus.total_accounts > 0 
           ? `${multiStatus.processed_count}/${multiStatus.total_accounts} accounts processed`
           : s.message,
@@ -2335,12 +2348,22 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
   }
 
   async refreshScreen(): Promise<void> {
+    const serial = this.getScreenshotDeviceSerial();
+    if (!serial) {
+      return;
+    }
+
     this.isRefreshingScreen.set(true);
     try {
-      const response = await fetch('/api/v1/daily-login/screenshot');
+      const response = await fetch(`/api/v1/devices/${encodeURIComponent(serial)}/screenshot`);
       const result = await response.json();
       if (result.success && result.image) {
         this.screenImage.set(result.image);
+        this.devicePreviews.set(
+          this.devicePreviews().map(preview =>
+            preview.serial === serial ? { ...preview, image: result.image } : preview
+          )
+        );
       }
     } catch (error) {
       // Silent fail
@@ -2350,6 +2373,22 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
   }
 
   private screenInterval: any = null;
+
+  private getScreenshotDeviceSerial(): string {
+    const runningPreview = this.devicePreviews().find(preview =>
+      preview.status === 'online' && preview.isRunning
+    );
+    if (runningPreview) {
+      return runningPreview.serial;
+    }
+
+    const selectedDevice = this.getSelectedDevices()[0];
+    if (selectedDevice) {
+      return selectedDevice.serial;
+    }
+
+    return this.exportDeviceSerial;
+  }
 
   private startScreenRefresh(): void {
     if (this.screenInterval) return;
@@ -2539,20 +2578,27 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
     this.addLog('📸 Refreshing all device screenshots...');
 
     try {
-      const response = await fetch('/api/v1/devices/screenshots/all');
-      const data = await response.json();
+      const [data, multiStatus] = await Promise.all([
+        fetch('/api/v1/devices/screenshots/all').then(response => response.json()),
+        fetch('/api/v1/multi-device/status')
+          .then(response => response.json())
+          .catch(() => null)
+      ]);
 
       if (data.success) {
         const existingPreviewMap = new Map(
           this.devicePreviews().map(preview => [preview.serial, preview])
+        );
+        const deviceStatusMap = new Map(
+          (multiStatus?.devices || []).map((device: any) => [device.serial, device])
         );
 
         const previews: DevicePreview[] = data.devices.map((d: any) => ({
           serial: d.serial,
           status: d.status,
           image: d.success ? d.image : null,
-          currentAccount: existingPreviewMap.get(d.serial)?.currentAccount || '',
-          isRunning: existingPreviewMap.get(d.serial)?.isRunning || false
+          currentAccount: (deviceStatusMap.get(d.serial) as any)?.current_account || existingPreviewMap.get(d.serial)?.currentAccount || '',
+          isRunning: (deviceStatusMap.get(d.serial) as any)?.is_running ?? existingPreviewMap.get(d.serial)?.isRunning ?? false
         }));
         this.devicePreviews.set(previews);
         this.addLog(`✅ Loaded ${previews.length} device screenshots`);
