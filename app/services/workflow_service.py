@@ -10,6 +10,7 @@ import asyncio
 import os
 
 from app.core.database import async_session_maker
+from app.core.path_safety import require_allowed_path
 from app.models.workflow import Workflow, WorkflowStep, WorkflowTemplate
 
 
@@ -778,6 +779,12 @@ class WorkflowService:
                                         
                                         # Export XML
                                         if save_folder:
+                                            try:
+                                                save_path = require_allowed_path(save_folder)
+                                            except ValueError as e:
+                                                print(f"[DEBUG] Export folder rejected: {e}")
+                                                continue
+
                                             timestamp = datetime.now().strftime("%Y%m%d")
                                             # Clean character name for filename
                                             clean_name = matched.replace(" ", "_").replace("/", "_")
@@ -792,7 +799,7 @@ class WorkflowService:
                                             adb.shell_su(f"cp {LINERANGERS_PREF_PATH} {temp_path}")
                                             adb.shell_su(f"chmod 644 {temp_path}")
                                             
-                                            output_path = Path(save_folder) / filename
+                                            output_path = save_path / filename
                                             if adb.pull_file(temp_path, str(output_path)):
                                                 print(f"[DEBUG] ✅ Exported successfully: {output_path}")
                                             else:
@@ -886,6 +893,12 @@ class WorkflowService:
                             
                             # Export XML
                             if save_folder:
+                                try:
+                                    save_path = require_allowed_path(save_folder)
+                                except ValueError as e:
+                                    print(f"[DEBUG] Export folder rejected: {e}")
+                                    return {"success": False, "message": str(e)}
+
                                 timestamp = datetime.now().strftime("%Y%m%d")
                                 clean_name = matched.replace(" ", "_").replace("/", "_")
                                 filename = f"{clean_name}_{timestamp}_LINE_COCOS_PREF_KEY.xml"
@@ -896,7 +909,7 @@ class WorkflowService:
                                 adb.shell_su(f"cp {LINERANGERS_PREF_PATH} {temp_path}")
                                 adb.shell_su(f"chmod 644 {temp_path}")
                                 
-                                output_path = Path(save_folder) / filename
+                                output_path = save_path / filename
                                 if adb.pull_file(temp_path, str(output_path)):
                                     print(f"[DEBUG] ✅ Exported: {output_path}")
                                 else:

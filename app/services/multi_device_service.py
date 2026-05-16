@@ -77,6 +77,11 @@ class SharedAccountQueue:
         
         logger.info(f"Loaded {len(self._accounts)} accounts into shared queue")
         return len(self._accounts)
+
+    def known_accounts(self) -> List[AccountInfo]:
+        """Return a snapshot of accounts currently known to the queue."""
+        with self._lock:
+            return list(self._accounts)
     
     def get_next_account(self) -> Optional[AccountInfo]:
         """Get the next unprocessed account (thread-safe)."""
@@ -157,7 +162,13 @@ class SharedAccountQueue:
             
             # Use custom folder or create 'done' subfolder
             if self.custom_done_folder:
-                done_folder = Path(self.custom_done_folder)
+                from app.core.path_safety import require_allowed_path
+
+                try:
+                    done_folder = require_allowed_path(self.custom_done_folder)
+                except ValueError as e:
+                    logger.error(str(e))
+                    return False
             else:
                 done_folder = source.parent / "done"
             
@@ -198,6 +209,11 @@ class SharedAccountQueue:
             # Delete file from disk
             try:
                 if source.exists():
+                    from app.core.path_safety import is_allowed_path
+
+                    if not is_allowed_path(source):
+                        logger.error(f"Refusing to delete outside allowed roots: {source}")
+                        return False
                     source.unlink()
                     logger.info(f"Deleted bugged file: {filename}")
                 

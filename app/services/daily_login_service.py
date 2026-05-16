@@ -13,6 +13,7 @@ from loguru import logger
 
 from app.services.adb_service import AdbService
 from app.services.template_service import TemplateService, DailyClaimTemplates
+from app.core.path_safety import is_allowed_path, require_allowed_path, require_safe_filename
 from app.config import ADB_HOST, ADB_PORT, ADB_DEVICE_SERIAL
 
 
@@ -169,6 +170,7 @@ class DailyLoginService:
                     if not dry_run:
                         # Remove the file from folder B
                         try:
+                            require_allowed_path(file_b)
                             os.remove(str(file_b))
                             result["removed_count"] += 1
                             self._emit_log(f"🗑️ Removed: {file_b.name}")
@@ -264,7 +266,12 @@ class DailyLoginService:
         }
         
         # Validate folder
-        save_path = Path(save_folder)
+        try:
+            save_path = require_allowed_path(save_folder)
+        except ValueError as e:
+            result["message"] = str(e)
+            return result
+
         if not save_path.exists():
             try:
                 save_path.mkdir(parents=True, exist_ok=True)
@@ -278,10 +285,11 @@ class DailyLoginService:
             return result
         
         # Clean filename - remove .xml if already present, then add it
-        clean_filename = filename.strip()
-        if clean_filename.lower().endswith('.xml'):
-            clean_filename = clean_filename[:-4]
-        clean_filename = clean_filename + '.xml'
+        try:
+            clean_filename = require_safe_filename(filename, suffix=".xml")
+        except ValueError as e:
+            result["message"] = str(e)
+            return result
         
         # Full path for saving
         output_path = save_path / clean_filename
@@ -833,12 +841,19 @@ class DailyLoginService:
             
             # Export XML
             if save_folder:
+                try:
+                    save_path = require_allowed_path(save_folder)
+                except ValueError as e:
+                    self._emit_log(f"      Export folder rejected: {e}")
+                    logger.warning(str(e))
+                    return True
+
                 clean_name = matched.replace(" ", "_").replace("/", "_")
                 base_filename = f"{clean_name}.xml"
-                output_path = Path(save_folder) / base_filename
+                output_path = save_path / base_filename
                 counter = 1
                 while output_path.exists():
-                    output_path = Path(save_folder) / f"{clean_name}_{counter}.xml"
+                    output_path = save_path / f"{clean_name}_{counter}.xml"
                     counter += 1
                 filename = output_path.name
                 
@@ -849,7 +864,7 @@ class DailyLoginService:
                 self.adb.shell_su(f"cp {LINERANGERS_PREF_PATH} {temp_path}")
                 self.adb.shell_su(f"chmod 644 {temp_path}")
                 
-                output_path = Path(save_folder) / filename
+                output_path = save_path / filename
                 if self.adb.pull_file(temp_path, str(output_path)):
                     self._emit_log(f"      ✅ Exported successfully: {output_path}")
                     
@@ -858,10 +873,13 @@ class DailyLoginService:
                         try:
                             import os
                             original_file = Path(self._current_account_filepath)
-                            if original_file.exists():
+                            if original_file.exists() and is_allowed_path(original_file):
                                 os.remove(str(original_file))
                                 self._emit_log(f"      🗑️ Deleted original file: {original_file.name}")
                                 logger.info(f"Deleted original account file: {original_file}")
+                            elif original_file.exists():
+                                self._emit_log(f"      Skipped delete outside allowed roots: {original_file}")
+                                logger.warning(f"Skipped deleting account outside allowed roots: {original_file}")
                             else:
                                 self._emit_log(f"      ⚠️ Original file not found: {original_file}")
                         except Exception as e:

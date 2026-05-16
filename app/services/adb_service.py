@@ -2,6 +2,7 @@
 ADB Service - Handles all Android Debug Bridge communication.
 """
 import subprocess
+import shlex
 from typing import Optional, Tuple
 from loguru import logger
 import numpy as np
@@ -222,15 +223,10 @@ class AdbService:
     def shell_su(self, command: str) -> Tuple[bool, str]:
         """Run a shell command with root (su) privileges."""
         try:
-            # Wrap command in quotes for su -c as it expects the entire command as one argument
-            # Use double quotes to wrap, escape any existing double quotes in the command
-            escaped_command = command.replace('"', '\\"')
-            full_shell_cmd = f'su -c "{escaped_command}"'
-            
-            logger.debug(f"Running: adb -s {self.device_address} shell {full_shell_cmd}")
+            logger.debug(f"Running: adb -s {self.device_address} shell su -c <command>")
             
             result = subprocess.run(
-                [self._adb, "-s", self.device_address, "shell", full_shell_cmd],
+                [self._adb, "-s", self.device_address, "shell", "su", "-c", command],
                 capture_output=True,
                 encoding='utf-8',
                 errors='replace',
@@ -374,13 +370,15 @@ class AdbService:
     
     def copy_file_with_root(self, source: str, dest: str) -> bool:
         """Copy a file with root privileges (useful for /data/data/ paths)."""
-        success, _ = self.shell_su(f"cp '{source}' '{dest}'")
+        quoted_source = shlex.quote(source)
+        quoted_dest = shlex.quote(dest)
+        success, _ = self.shell_su(f"cp {quoted_source} {quoted_dest}")
         if success:
             # Set proper permissions
-            self.shell_su(f"chmod 660 '{dest}'")
+            self.shell_su(f"chmod 660 {quoted_dest}")
             # Get the correct owner from the parent directory (shared_prefs)
             parent_dir = dest.rsplit('/', 1)[0]
-            _, stat_output = self.shell_su(f"stat -c '%U:%G' '{parent_dir}'")
+            _, stat_output = self.shell_su(f"stat -c '%U:%G' {shlex.quote(parent_dir)}")
             owner = stat_output.strip() if stat_output.strip() else "system:system"
-            self.shell_su(f"chown {owner} '{dest}'")
+            self.shell_su(f"chown {shlex.quote(owner)} {quoted_dest}")
         return success

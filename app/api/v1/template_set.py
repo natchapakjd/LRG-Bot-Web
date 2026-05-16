@@ -52,6 +52,14 @@ async def list_template_sets(category: Optional[str] = None):
     return {"success": True, "template_sets": template_sets}
 
 
+@router.get("/category/{category}")
+async def get_template_sets_by_category(category: str):
+    """Get all template sets in a category."""
+    service = get_template_set_service()
+    template_sets = await service.list_template_sets(category)
+    return {"success": True, "template_sets": template_sets, "category": category}
+
+
 @router.get("/{template_set_id}")
 async def get_template_set(template_set_id: int, include_workflows: bool = False):
     """Get a specific template set."""
@@ -92,14 +100,6 @@ async def delete_template_set(template_set_id: int):
     if success:
         return {"success": True, "message": "Template set deleted"}
     raise HTTPException(status_code=404, detail="Template set not found")
-
-
-@router.get("/category/{category}")
-async def get_template_sets_by_category(category: str):
-    """Get all template sets in a category."""
-    service = get_template_set_service()
-    template_sets = await service.list_template_sets(category)
-    return {"success": True, "template_sets": template_sets, "category": category}
 
 
 @router.post("/{template_set_id}/workflows/{workflow_id}")

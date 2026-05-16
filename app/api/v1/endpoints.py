@@ -4,6 +4,7 @@ API Endpoints - HTTP routes for bot control.
 from fastapi import APIRouter
 from app.schemas.status import CommandResponse, BotStatus
 from app.core import BotLifecycle
+from app.core.path_safety import require_allowed_path, safe_relative_folder
 from loguru import logger
 
 router = APIRouter(prefix="/api/v1", tags=["Bot Control"])
@@ -779,6 +780,22 @@ async def find_duplicates(request: FindDuplicatesRequest):
     - dry_run: ถ้า True จะแค่แสดง preview ว่าจะลบอะไรบ้าง (default)
     """
     service = get_daily_login_service()
+    if not request.dry_run:
+        try:
+            require_allowed_path(request.folder_b)
+        except ValueError as e:
+            return {
+                "success": False,
+                "dry_run": request.dry_run,
+                "folder_a_count": 0,
+                "folder_b_count": 0,
+                "duplicates_found": 0,
+                "removed_count": 0,
+                "duplicates": [],
+                "errors": [str(e)],
+                "message": "Folder B is outside allowed file roots"
+            }
+
     result = service.find_duplicates_and_remove(
         folder_a=request.folder_a,
         folder_b=request.folder_b,
@@ -812,13 +829,24 @@ async def copy_accounts(request: CopyAccountsRequest):
     """
     import shutil
     import os
+    from pathlib import Path
 
-    dest = request.destination_folder
-    if request.label:
-        dest = os.path.join(dest, request.label)
+    service = get_daily_login_service()
+    orchestrator = get_multi_device_orchestrator()
+    known_sources = {
+        str(Path(account.filepath).expanduser().resolve(strict=False))
+        for account in service.status.accounts
+    }
+    known_sources.update(
+        str(Path(account.filepath).expanduser().resolve(strict=False))
+        for account in orchestrator.queue.known_accounts()
+    )
 
     try:
+        dest = require_allowed_path(Path(request.destination_folder) / safe_relative_folder(request.label))
         os.makedirs(dest, exist_ok=True)
+        if not dest.is_dir():
+            return {"success": False, "message": f"Not a directory: {dest}", "copied": [], "errors": []}
     except Exception as e:
         return {"success": False, "message": f"Cannot create destination folder: {e}", "copied": [], "errors": []}
 
@@ -826,9 +854,15 @@ async def copy_accounts(request: CopyAccountsRequest):
     errors = []
     for filepath in request.source_filepaths:
         try:
-            filename = os.path.basename(filepath)
-            dest_path = os.path.join(dest, filename)
-            shutil.copy2(filepath, dest_path)
+            source = Path(filepath).expanduser().resolve(strict=False)
+            if str(source) not in known_sources:
+                raise ValueError("source file was not scanned/loaded by this session")
+            if not source.exists() or not source.is_file() or source.suffix.lower() != ".xml":
+                raise ValueError("source must be an existing XML file")
+
+            filename = os.path.basename(source)
+            dest_path = dest / filename
+            shutil.copy2(source, dest_path)
             copied.append(filename)
         except Exception as e:
             errors.append(f"{os.path.basename(filepath)}: {e}")
@@ -858,6 +892,11 @@ async def export_account(request: ExportAccountRequest):
     - device_serial: Serial ของ device (optional, ใช้ default ถ้าไม่ระบุ)
     """
     service = get_daily_login_service()
+    try:
+        require_allowed_path(request.save_folder)
+    except ValueError as e:
+        return {"success": False, "filepath": "", "message": str(e)}
+
     result = service.export_account(
         save_folder=request.save_folder,
         filename=request.filename,

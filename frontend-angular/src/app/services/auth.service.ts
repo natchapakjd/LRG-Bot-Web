@@ -34,7 +34,7 @@ export class AuthService {
   
   constructor() {
     this.installFetchInterceptor();
-    // Load from localStorage on init
+    // Load from sessionStorage on init
     this.loadFromStorage();
   }
 
@@ -54,8 +54,10 @@ export class AuthService {
           ? input.toString()
           : input.url;
 
-      const isApiRequest = requestUrl.startsWith('/api/') || requestUrl.includes('/api/');
-      const isPublicAuthRequest = requestUrl.includes('/api/v1/auth/login') || requestUrl.includes('/api/v1/auth/register');
+      const parsedUrl = new URL(requestUrl, window.location.origin);
+      const isSameOrigin = parsedUrl.origin === window.location.origin;
+      const isApiRequest = isSameOrigin && parsedUrl.pathname.startsWith('/api/');
+      const isPublicAuthRequest = parsedUrl.pathname === '/api/v1/auth/login' || parsedUrl.pathname === '/api/v1/auth/register';
       const token = this._token();
 
       let nextInit = init;
@@ -81,8 +83,8 @@ export class AuthService {
   }
   
   private loadFromStorage(): void {
-    const token = localStorage.getItem(this.TOKEN_KEY);
-    const userStr = localStorage.getItem(this.USER_KEY);
+    const token = sessionStorage.getItem(this.TOKEN_KEY);
+    const userStr = sessionStorage.getItem(this.USER_KEY);
     
     if (token) {
       this._token.set(token);
@@ -97,15 +99,15 @@ export class AuthService {
   }
   
   private saveToStorage(token: string, user: User): void {
-    localStorage.setItem(this.TOKEN_KEY, token);
-    localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+    sessionStorage.setItem(this.TOKEN_KEY, token);
+    sessionStorage.setItem(this.USER_KEY, JSON.stringify(user));
     this._token.set(token);
     this._user.set(user);
   }
   
   private clearStorage(): void {
-    localStorage.removeItem(this.TOKEN_KEY);
-    localStorage.removeItem(this.USER_KEY);
+    sessionStorage.removeItem(this.TOKEN_KEY);
+    sessionStorage.removeItem(this.USER_KEY);
     this._token.set(null);
     this._user.set(null);
   }
@@ -159,7 +161,7 @@ export class AuthService {
         const data = await response.json();
         if (data.user) {
           this._user.set(data.user);
-          localStorage.setItem(this.USER_KEY, JSON.stringify(data.user));
+          sessionStorage.setItem(this.USER_KEY, JSON.stringify(data.user));
           return true;
         }
       }

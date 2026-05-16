@@ -267,6 +267,14 @@ export class MasterDataComponent implements OnInit {
     });
   }
 
+  private escapeHtml(value: unknown): string {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
   async openCreateDialog() {
     const isStepType = this.activeTab === 'step-type';
 
@@ -338,11 +346,11 @@ export class MasterDataComponent implements OnInit {
       html: `
         <div style="display:flex;flex-direction:column;gap:10px;text-align:left">
           <label style="font-size:0.82rem;color:#aaa">Display Name *</label>
-          <input id="sw-name" class="swal2-input" value="${item.display_name}" style="margin:0">
+          <input id="sw-name" class="swal2-input" value="${this.escapeHtml(item.display_name)}" style="margin:0">
           <label style="font-size:0.82rem;color:#aaa">Description</label>
-          <input id="sw-desc" class="swal2-input" value="${item.description ?? ''}" style="margin:0">
+          <input id="sw-desc" class="swal2-input" value="${this.escapeHtml(item.description)}" style="margin:0">
           <label style="font-size:0.82rem;color:#aaa">Icon (Emoji)</label>
-          <input id="sw-icon" class="swal2-input" value="${item.icon ?? ''}" style="margin:0;width:80px">
+          <input id="sw-icon" class="swal2-input" value="${this.escapeHtml(item.icon)}" style="margin:0;width:80px">
           ${isStepType ? `
           <label style="font-size:0.82rem;color:#aaa">Category</label>
           <select id="sw-cat" class="swal2-input" style="margin:0">

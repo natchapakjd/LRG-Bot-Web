@@ -26,18 +26,19 @@ export class BotService {
   }
 
   private connect(): void {
-    const token = localStorage.getItem('lrg_bot_token');
+    const token = sessionStorage.getItem('lrg_bot_token');
     if (!token) {
       this.isConnected.set(false);
       return;
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
     
     this.ws = new WebSocket(wsUrl);
     
     this.ws.onopen = () => {
+      this.ws?.send(JSON.stringify({ type: 'auth', token }));
       this.reconnectAttempts = 0;
       this.isConnected.set(true);
       this.addLog('🔌 Connected to server');

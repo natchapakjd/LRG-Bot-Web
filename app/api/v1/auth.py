@@ -1,7 +1,7 @@
 """
 Authentication API endpoints.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from typing import Optional
 
@@ -12,6 +12,8 @@ from app.services.auth_service import (
     require_admin
 )
 from app.models.user import User
+from app.config import RATE_LIMIT_LOGIN
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -50,15 +52,16 @@ async def register(request: RegisterRequest):
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(request: LoginRequest):
+@limiter.limit(f"{RATE_LIMIT_LOGIN}/minute")
+async def login(request: Request, payload: LoginRequest):
     """
     Login with username and password.
     Returns JWT token on success.
     """
     service = get_auth_service()
     success, message, user = await service.authenticate(
-        request.username,
-        request.password
+        payload.username,
+        payload.password
     )
     
     if not success:

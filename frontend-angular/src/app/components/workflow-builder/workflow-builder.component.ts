@@ -1204,7 +1204,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy {
     
     const result = await Swal.fire({
       title: 'Delete Workflow?',
-      html: `Are you sure you want to delete <strong>"${workflowName}"</strong>?<br><br>This action cannot be undone.`,
+      text: `Are you sure you want to delete "${workflowName}"? This action cannot be undone.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#fb7185',

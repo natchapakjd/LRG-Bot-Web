@@ -2228,7 +2228,7 @@ export class DailyLoginComponent implements OnInit, OnDestroy {
   async browseCopyDestFolder(): Promise<void> {
     this.isBrowsingCopyDest.set(true);
     try {
-      const response = await fetch('/api/v1/daily-login/browse-folder');
+      const response = await fetch('/api/v1/browse-folder');
       const data = await response.json();
       if (data.success && data.folder_path) {
         this.copyDestFolder = data.folder_path;

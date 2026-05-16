@@ -20,7 +20,6 @@ class ConnectionManager:
         self.active_connections: List[WebSocket] = []
     
     async def connect(self, websocket: WebSocket):
-        await websocket.accept()
         self.active_connections.append(websocket)
         logger.info(f"WebSocket connected. Total: {len(self.active_connections)}")
     
@@ -42,7 +41,17 @@ manager = ConnectionManager()
 
 
 async def authenticate_websocket(websocket: WebSocket) -> bool:
-    token = websocket.query_params.get("token")
+    try:
+        auth_message = await asyncio.wait_for(websocket.receive_json(), timeout=5)
+    except Exception:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return False
+
+    if auth_message.get("type") != "auth":
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return False
+
+    token = auth_message.get("token")
     if not token:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return False
@@ -64,6 +73,7 @@ async def authenticate_websocket(websocket: WebSocket) -> bool:
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates."""
+    await websocket.accept()
     if not await authenticate_websocket(websocket):
         return
 

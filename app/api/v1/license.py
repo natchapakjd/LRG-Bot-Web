@@ -2,7 +2,7 @@
 License API endpoints for user and admin operations.
 """
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from loguru import logger
 
@@ -10,6 +10,8 @@ from app.services.license_service import get_license_service, LicenseService
 from app.services.auth_service import require_admin
 from app.models.user import User
 from app.core.database import init_db
+from app.config import RATE_LIMIT_LICENSE
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/license", tags=["License"])
 admin_router = APIRouter(prefix="/api/v1/admin/license", tags=["Admin - License"])
@@ -37,7 +39,8 @@ class LicenseResponse(BaseModel):
 # ===== User Endpoints =====
 
 @router.post("/activate", response_model=LicenseResponse)
-async def activate_license(request: ActivateLicenseRequest):
+@limiter.limit(f"{RATE_LIMIT_LICENSE}/minute")
+async def activate_license(request: Request, payload: ActivateLicenseRequest):
     """
     Activate a license on this device.
     Binds the license to this hardware if not already activated.
@@ -46,7 +49,7 @@ async def activate_license(request: ActivateLicenseRequest):
     hardware_id = service.get_hardware_id()
     
     success, message, license_obj = await service.activate_license(
-        request.license_key,
+        payload.license_key,
         hardware_id
     )
     
@@ -60,7 +63,8 @@ async def activate_license(request: ActivateLicenseRequest):
 
 
 @router.get("/status", response_model=LicenseResponse)
-async def get_license_status(license_key: str):
+@limiter.limit(f"{RATE_LIMIT_LICENSE}/minute")
+async def get_license_status(request: Request, license_key: str):
     """
     Check the status of a license on this device.
     """
@@ -93,7 +97,8 @@ async def get_hardware_id():
 
 
 @router.get("/check")
-async def check_license_valid():
+@limiter.limit(f"{RATE_LIMIT_LICENSE}/minute")
+async def check_license_valid(request: Request):
     """
     Check if this device has a valid license.
     Used by frontend to determine if user can access protected features.

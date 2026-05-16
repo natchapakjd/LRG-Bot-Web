@@ -14,6 +14,7 @@ import os
 import sys
 import shutil
 import subprocess
+import secrets
 from pathlib import Path
 
 # Paths
@@ -28,7 +29,7 @@ BUILD_DIR = ROOT_DIR / "build"
 def run_command(cmd: list, cwd: Path = None, check: bool = True):
     """Run a command and print output."""
     print(f"🔧 Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=cwd, shell=True)
+    result = subprocess.run(cmd, cwd=cwd)
     if check and result.returncode != 0:
         print(f"❌ Command failed with code {result.returncode}")
         sys.exit(1)
@@ -183,12 +184,17 @@ def build_exe():
     dist_app_dir = DIST_DIR / "LRG-Bot.dist"
     if dist_app_dir.exists():
         # Create .env file for production
-        env_content = """# LRG Bot Configuration
-LICENSE_BYPASS=true
+        admin_password = secrets.token_urlsafe(18)
+        env_content = f"""# LRG Bot Configuration
+LICENSE_BYPASS=false
 IS_PRODUCTION_BUILD=true
-SECRET_KEY=your-production-secret-key-here
+API_HOST=127.0.0.1
+SECRET_KEY={secrets.token_urlsafe(48)}
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD={admin_password}
 """
         (dist_app_dir / ".env").write_text(env_content)
+        print(f"Initial admin password: {admin_password}")
         
         print(f"\n✅ Build complete!")
         print(f"📁 Output: {dist_app_dir}")
@@ -199,12 +205,17 @@ SECRET_KEY=your-production-secret-key-here
         if alt_dist.exists():
             final_dist = DIST_DIR / "LRG-Bot"
             shutil.move(str(alt_dist), str(final_dist))
-            env_content = """# LRG Bot Configuration
-LICENSE_BYPASS=true
+            admin_password = secrets.token_urlsafe(18)
+            env_content = f"""# LRG Bot Configuration
+LICENSE_BYPASS=false
 IS_PRODUCTION_BUILD=true
-SECRET_KEY=your-production-secret-key-here
+API_HOST=127.0.0.1
+SECRET_KEY={secrets.token_urlsafe(48)}
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD={admin_password}
 """
             (final_dist / ".env").write_text(env_content)
+            print(f"Initial admin password: {admin_password}")
             print(f"\n✅ Build complete!")
             print(f"📁 Output: {final_dist}")
             print(f"🚀 Run: {final_dist / 'LRG-Bot.exe'}")

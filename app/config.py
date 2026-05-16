@@ -12,6 +12,16 @@ load_dotenv()
 # Project paths
 PROJECT_ROOT = Path(__file__).parent.parent
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
+ACCOUNTS_DIR = PROJECT_ROOT / "accounts"
+EXPORTS_DIR = PROJECT_ROOT / "exports"
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    """Read a boolean environment variable."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 # ADB Settings
 ADB_PATH = os.getenv("ADB_PATH", "adb")
@@ -24,8 +34,8 @@ BOT_LOOP_INTERVAL = 0.5  # seconds between each loop iteration
 MATCH_THRESHOLD = 0.8  # OpenCV template match threshold (0.0 - 1.0)
 
 # Server Settings
-API_HOST = "0.0.0.0"
-API_PORT = 8000
+API_HOST = os.getenv("API_HOST", "127.0.0.1")
+API_PORT = int(os.getenv("API_PORT", "8000"))
 
 # ===== Database Settings =====
 DB_DRIVER = os.getenv("DB_DRIVER", "mysql+aiomysql")
@@ -54,6 +64,17 @@ DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "ChangeThisPassword
 _cors_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:4200,http://localhost:8000")
 ALLOWED_ORIGINS = [origin.strip() for origin in _cors_origins.split(",")]
 
+# ===== File Operation Safety =====
+_file_roots = os.getenv(
+    "FILE_OPERATION_ROOTS",
+    f"{ACCOUNTS_DIR},{EXPORTS_DIR},{PROJECT_ROOT / 'backups'}"
+)
+FILE_OPERATION_ROOTS = [
+    (Path(path.strip()).expanduser() if Path(path.strip()).is_absolute() else PROJECT_ROOT / path.strip()).resolve()
+    for path in _file_roots.split(",")
+    if path.strip()
+]
+
 # ===== Rate Limiting Settings =====
 RATE_LIMIT_LOGIN = int(os.getenv("RATE_LIMIT_LOGIN", "5"))
 RATE_LIMIT_LICENSE = int(os.getenv("RATE_LIMIT_LICENSE", "10"))
@@ -62,11 +83,44 @@ RATE_LIMIT_GLOBAL = int(os.getenv("RATE_LIMIT_GLOBAL", "100"))
 # ===== License Settings =====
 # Set to True to bypass license check (for development/testing)
 # TODO: Set to False and implement online license server for production
-LICENSE_BYPASS = os.getenv("LICENSE_BYPASS", "true").lower() == "true"
+LICENSE_BYPASS = _env_bool("LICENSE_BYPASS", False)
 
 # Online License Server (for future use)
 LICENSE_SERVER_URL = os.getenv("LICENSE_SERVER_URL", "")  # e.g., "https://your-license-server.com/api"
 
 # ===== Build Mode =====
 # Set to True when building for distribution
-IS_PRODUCTION_BUILD = os.getenv("IS_PRODUCTION_BUILD", "false").lower() == "true"
+IS_PRODUCTION_BUILD = _env_bool("IS_PRODUCTION_BUILD", False)
+
+
+def _validate_security_settings() -> None:
+    """Fail fast when packaged/production mode uses unsafe defaults."""
+    unsafe_secret_values = {
+        "",
+        "lrg-bot-secret-key-change-in-production-2024",
+        "your-super-secret-key-change-in-production-2024",
+        "your-production-secret-key-here",
+        "change-this-to-a-strong-random-secret-before-use",
+    }
+    unsafe_admin_passwords = {"", "ChangeThisPassword123!", "change-this-admin-password", "admin", "password"}
+
+    public_bind = API_HOST in {"0.0.0.0", "::"}
+    if not IS_PRODUCTION_BUILD and public_bind and LICENSE_BYPASS:
+        raise RuntimeError("Refusing to bind publicly while LICENSE_BYPASS is enabled")
+
+    if not IS_PRODUCTION_BUILD:
+        return
+
+    problems = []
+    if SECRET_KEY in unsafe_secret_values or len(SECRET_KEY) < 32:
+        problems.append("SECRET_KEY must be a strong unique value in production")
+    if LICENSE_BYPASS:
+        problems.append("LICENSE_BYPASS must be false in production")
+    if DEFAULT_ADMIN_PASSWORD in unsafe_admin_passwords or len(DEFAULT_ADMIN_PASSWORD) < 12:
+        problems.append("DEFAULT_ADMIN_PASSWORD must be changed in production")
+
+    if problems:
+        raise RuntimeError("Unsafe production configuration: " + "; ".join(problems))
+
+
+_validate_security_settings()
